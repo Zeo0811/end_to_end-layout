@@ -6,8 +6,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npx playwright install chromium --with-deps"
+    "start": "node server.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
