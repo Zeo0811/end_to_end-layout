@@ -13,12 +13,26 @@ const PORT = process.env.PORT || 3000;
 db.seedAccountsFromEnv();
 db.ensureAdmin();
 
-// token → user 映射
+// token → { user, createdAt } 映射
 const sessions = new Map();
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 小时
 
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
+
+// 定期清理过期 session（每小时）
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [token, session] of sessions) {
+    if (now - session.createdAt > SESSION_TTL) {
+      sessions.delete(token);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) console.log(`[Session] 清理 ${cleaned} 个过期 session`);
+}, 60 * 60 * 1000);
 
 // wechat client 缓存
 const clientCache = new Map();
@@ -48,9 +62,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 认证中间件
 function auth(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
-  const user = sessions.get(token);
-  if (!user) return res.status(401).json({ error: '请先登录' });
-  req.user = user;
+  const session = sessions.get(token);
+  if (!session) return res.status(401).json({ error: '请先登录' });
+  if (Date.now() - session.createdAt > SESSION_TTL) {
+    sessions.delete(token);
+    return res.status(401).json({ error: '登录已过期，请重新登录' });
+  }
+  req.user = { id: session.id, username: session.username, role: session.role };
   next();
 }
 
@@ -66,7 +84,7 @@ app.post('/api/login', (req, res) => {
   const user = db.authenticate(username, password);
   if (!user) return res.status(401).json({ error: '用户名或密码错误' });
   const token = generateToken();
-  sessions.set(token, user);
+  sessions.set(token, { ...user, createdAt: Date.now() });
   res.json({ ok: true, token, user: { username: user.username, role: user.role } });
 });
 

@@ -7,11 +7,19 @@ function createClient(appId, appSecret) {
   }
 
   let tokenCache = { token: null, expiresAt: 0 };
+  let tokenRefreshing = null; // 防止并发刷新
 
   async function getAccessToken() {
     if (tokenCache.token && Date.now() < tokenCache.expiresAt) {
       return tokenCache.token;
     }
+    // 防止并发请求同时刷新 token
+    if (tokenRefreshing) return tokenRefreshing;
+    tokenRefreshing = _refreshToken();
+    try { return await tokenRefreshing; } finally { tokenRefreshing = null; }
+  }
+
+  async function _refreshToken() {
     const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appId}&secret=${appSecret}`;
     const res  = await fetch(url);
     const data = await res.json();
@@ -24,6 +32,25 @@ function createClient(appId, appSecret) {
     };
     console.log(`[WeChat:${appId.slice(-4)}] access_token refreshed, expires_in: ${data.expires_in}`);
     return data.access_token;
+  }
+
+  function invalidateToken() {
+    tokenCache = { token: null, expiresAt: 0 };
+  }
+
+  // 带 token 过期自动重试的 API 调用包装
+  async function apiCallWithRetry(fn) {
+    try {
+      return await fn();
+    } catch (e) {
+      // 40001/42001 = token 过期/无效，刷新后重试一次
+      if (e.message && /\[4000[12]\]|\[4200[12]\]/.test(e.message)) {
+        console.log(`[WeChat:${appId.slice(-4)}] token 过期，刷新重试...`);
+        invalidateToken();
+        return await fn();
+      }
+      throw e;
+    }
   }
 
   // ── multipart/form-data 构造（零依赖）──
@@ -49,40 +76,46 @@ function createClient(appId, appSecret) {
   }
 
   async function uploadArticleImage(imageBuffer, filename, mimeType) {
-    const token = await getAccessToken();
-    const url   = `https://api.weixin.qq.com/cgi-bin/media/uploadimg?access_token=${token}`;
-    const { body, contentType } = buildMultipart([
-      { name: 'media', filename: filename || 'image.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
-    ]);
-    const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
-    const data = await res.json();
-    if (data.errcode) throw new Error(`上传文章图片失败: [${data.errcode}] ${data.errmsg}`);
-    return data.url;
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/media/uploadimg?access_token=${token}`;
+      const { body, contentType } = buildMultipart([
+        { name: 'media', filename: filename || 'image.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
+      ]);
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`上传文章图片失败: [${data.errcode}] ${data.errmsg}`);
+      return data.url;
+    });
   }
 
   async function uploadPermanentImage(imageBuffer, filename, mimeType) {
-    const token = await getAccessToken();
-    const url   = `https://api.weixin.qq.com/cgi-bin/material/add_material?access_token=${token}&type=image`;
-    const { body, contentType } = buildMultipart([
-      { name: 'media', filename: filename || 'thumb.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
-    ]);
-    const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
-    const data = await res.json();
-    if (data.errcode) throw new Error(`上传永久素材失败: [${data.errcode}] ${data.errmsg}`);
-    return { media_id: data.media_id, url: data.url };
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/material/add_material?access_token=${token}&type=image`;
+      const { body, contentType } = buildMultipart([
+        { name: 'media', filename: filename || 'thumb.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
+      ]);
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`上传永久素材失败: [${data.errcode}] ${data.errmsg}`);
+      return { media_id: data.media_id, url: data.url };
+    });
   }
 
   async function createDraft(articles) {
-    const token = await getAccessToken();
-    const url   = `https://api.weixin.qq.com/cgi-bin/draft/add?access_token=${token}`;
-    const res = await fetch(url, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ articles }),
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/draft/add?access_token=${token}`;
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ articles }),
+      });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`创建草稿失败: [${data.errcode}] ${data.errmsg}`);
+      return data.media_id;
     });
-    const data = await res.json();
-    if (data.errcode) throw new Error(`创建草稿失败: [${data.errcode}] ${data.errmsg}`);
-    return data.media_id;
   }
 
   function extractImagesFromHtml(html) {
@@ -115,37 +148,54 @@ function createClient(appId, appSecret) {
     let firstImageMime   = null;
     let uploaded = 0;
 
-    for (const img of images) {
+    // 先准备所有图片的 buffer（并发下载）
+    const prepared = await Promise.all(images.map(async (img) => {
       try {
-        let imageBuffer, mimeType;
-
         if (img.src.startsWith('data:')) {
           const parsed = base64ToBuffer(img.src);
-          if (!parsed) continue;
-          imageBuffer = parsed.buffer;
-          mimeType    = parsed.mimeType;
+          return parsed ? { src: img.src, buffer: parsed.buffer, mime: parsed.mimeType } : null;
         } else if (img.src.startsWith('http')) {
           const resp = await fetch(img.src, { signal: AbortSignal.timeout(15000) });
-          if (!resp.ok) continue;
-          imageBuffer = Buffer.from(await resp.arrayBuffer());
-          mimeType    = resp.headers.get('content-type') || 'image/jpeg';
-        } else {
-          continue;
+          if (!resp.ok) return null;
+          return {
+            src: img.src,
+            buffer: Buffer.from(await resp.arrayBuffer()),
+            mime: resp.headers.get('content-type') || 'image/jpeg',
+          };
         }
-
-        if (!firstImageBuffer) {
-          firstImageBuffer = imageBuffer;
-          firstImageMime   = mimeType;
-        }
-
-        const filename = `img_${uploaded}${mimeToExt(mimeType)}`;
-        const wechatUrl = await uploadArticleImage(imageBuffer, filename, mimeType);
-        processedHtml = processedHtml.replace(img.src, wechatUrl);
-        uploaded++;
-        if (onProgress) onProgress(uploaded, images.length);
       } catch (err) {
-        console.error('图片上传失败:', img.src.slice(0, 80), err.message);
+        console.error('图片下载失败:', img.src.slice(0, 80), err.message);
       }
+      return null;
+    }));
+
+    // 并发上传到微信（最多 3 张同时）
+    const CONCURRENCY = 3;
+    const valid = prepared.filter(Boolean);
+
+    for (let i = 0; i < valid.length; i += CONCURRENCY) {
+      const batch = valid.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(batch.map(async (img, j) => {
+        const idx = i + j;
+        if (!firstImageBuffer) {
+          firstImageBuffer = img.buffer;
+          firstImageMime   = img.mime;
+        }
+        const filename = `img_${idx}${mimeToExt(img.mime)}`;
+        const wechatUrl = await uploadArticleImage(img.buffer, filename, img.mime);
+        return { src: img.src, wechatUrl };
+      }));
+
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) {
+          // replaceAll 确保同一张图多次出现都被替换
+          processedHtml = processedHtml.split(r.value.src).join(r.value.wechatUrl);
+          uploaded++;
+        } else if (r.status === 'rejected') {
+          console.error('图片上传失败:', r.reason?.message);
+        }
+      }
+      if (onProgress) onProgress(uploaded, valid.length);
     }
 
     return { html: processedHtml, firstImageBuffer, firstImageMime };
@@ -187,7 +237,7 @@ function createClient(appId, appSecret) {
     for (const m of matches) {
       try {
         console.log('[WeChat] 下载视频:', m.videoUrl.slice(0, 100));
-        const resp = await fetch(m.videoUrl, { redirect: 'follow' });
+        const resp = await fetch(m.videoUrl, { redirect: 'follow', signal: AbortSignal.timeout(60000) });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const videoBuffer = Buffer.from(await resp.arrayBuffer());
         const sizeMB = (videoBuffer.length / 1024 / 1024).toFixed(1);
@@ -259,16 +309,18 @@ function createClient(appId, appSecret) {
   }
 
   async function deleteDraft(mediaId) {
-    const token = await getAccessToken();
-    const url   = `https://api.weixin.qq.com/cgi-bin/draft/delete?access_token=${token}`;
-    const res = await fetch(url, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ media_id: mediaId }),
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/draft/delete?access_token=${token}`;
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ media_id: mediaId }),
+      });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`删除草稿失败: [${data.errcode}] ${data.errmsg}`);
+      console.log('[WeChat] 草稿已删除, media_id:', mediaId);
     });
-    const data = await res.json();
-    if (data.errcode) throw new Error(`删除草稿失败: [${data.errcode}] ${data.errmsg}`);
-    console.log('[WeChat] 草稿已删除, media_id:', mediaId);
   }
 
   return {

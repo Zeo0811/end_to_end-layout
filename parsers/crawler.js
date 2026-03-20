@@ -11,7 +11,16 @@ const notionParserCode = fs.readFileSync(path.join(__dirname, 'notion-parser.js'
 const feishuParserCode = fs.readFileSync(path.join(__dirname, 'feishu-parser.js'), 'utf8');
 
 async function ensureBrowser() {
-  if (browser && browser.isConnected()) return browser;
+  // 检测浏览器是否存活
+  if (browser) {
+    try {
+      if (browser.isConnected()) return browser;
+    } catch (_) {}
+    // 浏览器已断开或僵死，清理
+    try { await browser.close(); } catch (_) {}
+    browser = null;
+    console.log('[Crawler] 浏览器已断开，重新启动...');
+  }
 
   // 查找 Chromium 可执行文件路径：环境变量 > 系统 which > Playwright 内置
   let executablePath = process.env.CHROMIUM_PATH || undefined;
@@ -32,6 +41,13 @@ async function ensureBrowser() {
     executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   });
+
+  // 监听浏览器断开事件
+  browser.on('disconnected', () => {
+    console.log('[Crawler] 浏览器进程已断开');
+    browser = null;
+  });
+
   return browser;
 }
 
