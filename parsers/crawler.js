@@ -12,9 +12,24 @@ const feishuParserCode = fs.readFileSync(path.join(__dirname, 'feishu-parser.js'
 
 async function ensureBrowser() {
   if (browser && browser.isConnected()) return browser;
+
+  // 查找 Chromium 可执行文件路径：环境变量 > 系统 which > Playwright 内置
+  let executablePath = process.env.CHROMIUM_PATH || undefined;
+  if (!executablePath) {
+    try {
+      const { execSync } = require('child_process');
+      const sysPath = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf8' }).trim();
+      if (sysPath) executablePath = sysPath;
+    } catch (_) {}
+  }
+
+  if (executablePath) {
+    console.log(`[Crawler] 使用 Chromium: ${executablePath}`);
+  }
+
   browser = await chromium.launch({
     headless: true,
-    executablePath: process.env.CHROMIUM_PATH || undefined,
+    executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   });
   return browser;

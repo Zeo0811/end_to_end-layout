@@ -4,8 +4,5 @@ nixPkgs = ["...", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", 
 [phases.install]
 cmds = ["npm ci"]
 
-[phases.build]
-cmds = ["npx playwright install chromium"]
-
 [start]
 cmd = "node server.js"
