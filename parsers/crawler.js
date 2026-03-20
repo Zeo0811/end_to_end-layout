@@ -171,6 +171,7 @@ async function crawl(url) {
         return parseNotion();
       }, notionParserCode);
     } else {
+      // 飞书：scrollAndCollect 会滚动页面触发虚拟滚动加载
       result = await page.evaluate(async (parserCode) => {
         eval(parserCode);
         if (typeof scrollAndCollect === 'function') {
@@ -180,6 +181,59 @@ async function crawl(url) {
         }
         return parseFeishu();
       }, feishuParserCode);
+
+      // 飞书滚动后新加载的图片需要再次转换
+      await convertAllImages(page);
+    }
+
+    // 将 blocks 中的 blob: 图片在页面上下文中转为 base64
+    if (result && result.blocks) {
+      const blobUrls = result.blocks
+        .filter(b => b.type === 'image' && b.url && b.url.startsWith('blob:'))
+        .map(b => b.url);
+
+      if (blobUrls.length > 0) {
+        console.log(`[Crawler] 转换 ${blobUrls.length} 个 blob 图片...`);
+        const converted = await page.evaluate(async (urls) => {
+          const results = {};
+          for (const blobUrl of urls) {
+            try {
+              const resp = await fetch(blobUrl, { credentials: 'include' });
+              if (!resp.ok) continue;
+              const blob = await resp.blob();
+              const reader = new FileReader();
+              const dataUrl = await new Promise((resolve, reject) => {
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              results[blobUrl] = dataUrl;
+            } catch (e) {
+              // blob 可能已失效，尝试从 DOM 中找到对应 img 用 canvas 转换
+              try {
+                const img = document.querySelector(`img[src="${blobUrl}"]`) ||
+                            document.querySelector(`img[currentSrc="${blobUrl}"]`);
+                if (img && img.complete && img.naturalWidth > 0) {
+                  const canvas = document.createElement('canvas');
+                  canvas.width = img.naturalWidth;
+                  canvas.height = img.naturalHeight;
+                  canvas.getContext('2d').drawImage(img, 0, 0);
+                  results[blobUrl] = canvas.toDataURL('image/png');
+                }
+              } catch (e2) {}
+            }
+          }
+          return results;
+        }, blobUrls);
+
+        // 替换 blocks 中的 blob URL
+        for (const block of result.blocks) {
+          if (block.type === 'image' && block.url && converted[block.url]) {
+            block.url = converted[block.url];
+          }
+        }
+        console.log(`[Crawler] 成功转换 ${Object.keys(converted).length}/${blobUrls.length} 个 blob 图片`);
+      }
     }
 
     // 后处理：修复视频和图片 URL
