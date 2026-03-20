@@ -167,7 +167,7 @@
     #fireworks {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: 9999; cursor: pointer; display: none;
-      background: rgba(0,0,0,.3);
+      background: rgba(0,0,0,.15);
     }
     #fireworks.active { display: block; }
     .fw-hint {
@@ -192,7 +192,7 @@
       </div>
       <input type="text" id="loginUser" placeholder="用户名" autocomplete="username">
       <input type="password" id="loginPass" placeholder="密码" autocomplete="current-password">
-      <button class="btn-login" onclick="doLogin()">&#x1F513; 登 录</button>
+      <button class="btn-login" onclick="doLogin()">登 录</button>
       <div class="error" id="loginError"></div>
     </div>
   </div>
@@ -212,7 +212,7 @@
         <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">&#x2699;&#xFE0F; 管理后台</a>
         <span class="username" id="displayName"></span>
         <span class="admin-badge" id="adminBadge" style="display:none">管理员</span>
-        <button class="btn-text" onclick="doLogout()">&#x1F6AA; 退出</button>
+        <button class="btn-text" onclick="doLogout()">退出</button>
       </div>
     </div>
 
@@ -238,7 +238,7 @@
               <label>摘要（可选）</label>
               <input type="text" id="digestInput" placeholder="默认自动截取正文前 54 字">
             </div>
-            <button class="btn-publish" id="publishBtn" onclick="doPublish()">&#x1F680; 发布到草稿箱</button>
+            <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
             <div class="status-bar" id="status"></div>
           </div>
         </div>
@@ -578,7 +578,7 @@
           return;
         }
         // 半透明黑底产生拖尾效果
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         for (let i = fwParticles.length - 1; i >= 0; i--) {
