@@ -8,6 +8,7 @@
   <style>
     :root {
       --green: #407600;
+      --green-dark: #356200;
       --green-light: #f4f9ed;
       --green-border: #c5e0a5;
       --dark: #1a1a1a;
@@ -41,7 +42,7 @@
       border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
       margin-top: 8px; transition: background .2s;
     }
-    .login-box .btn-login:hover { background: #356200; }
+    .login-box .btn-login:hover { background: var(--green-dark); }
     .login-box .error { color: #d32; font-size: 13px; margin-top: 8px; display: none; }
 
     /* ── 主布局 ── */
@@ -49,7 +50,7 @@
     .header {
       background: #fff; border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px;
       display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 10;
+      position: sticky; top: 0; z-index: 100;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .header-left img { width: 32px; height: 32px; border-radius: 8px; }
@@ -57,87 +58,90 @@
     .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--gray); }
     .header-right .username { font-weight: 600; color: var(--dark); }
     .header-right .admin-badge { background: var(--green); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-    .btn-text { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 13px; }
+    .btn-text { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 13px; text-decoration: none; }
     .btn-text:hover { color: var(--dark); }
 
-    .main { max-width: 720px; margin: 32px auto; padding: 0 16px; }
+    /* ── 双栏 ── */
+    .content { display: flex; gap: 20px; max-width: 1200px; margin: 24px auto; padding: 0 24px; min-height: calc(100vh - 104px); }
+    .col-left { flex: 0 0 420px; }
+    .col-right { flex: 1; min-width: 0; }
 
-    /* ── 发布卡片 ── */
-    .publish-card {
-      background: #fff; border-radius: 12px; padding: 32px;
+    @media (max-width: 900px) {
+      .content { flex-direction: column; }
+      .col-left { flex: none; }
+    }
+
+    /* ── 卡片 ── */
+    .card {
+      background: #fff; border-radius: 12px; padding: 28px;
       box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
-    .publish-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 24px; color: var(--dark); }
-    .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: 13px; font-weight: 500; color: var(--gray); margin-bottom: 6px; }
-    .field input, .field select, .field textarea {
-      width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+    .card h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; color: var(--dark); }
+    .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--dark); }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--gray); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+    .field input, .field select {
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
       font-size: 14px; outline: none; transition: border .2s; font-family: inherit;
     }
-    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--green); }
+    .field input:focus, .field select:focus { border-color: var(--green); }
+
     .url-input {
-      font-size: 16px !important; padding: 16px 18px !important;
+      font-size: 15px !important; padding: 14px 16px !important;
       border: 2px solid var(--border) !important; border-radius: 10px !important;
     }
     .url-input:focus { border-color: var(--green) !important; box-shadow: 0 0 0 3px rgba(64,118,0,.1); }
+
     .row { display: flex; gap: 12px; }
     .row .field { flex: 1; }
 
     .btn-publish {
       width: 100%; padding: 14px; background: var(--green); color: #fff; border: none;
       border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
-      margin-top: 8px; transition: all .2s; letter-spacing: 0.5px;
+      margin-top: 4px; transition: all .2s; letter-spacing: .5px;
     }
-    .btn-publish:hover { background: #356200; }
+    .btn-publish:hover { background: var(--green-dark); }
     .btn-publish:disabled { background: #ccc; cursor: not-allowed; }
 
     .status-bar {
-      margin-top: 16px; padding: 12px 16px; border-radius: var(--radius); font-size: 13px;
+      margin-top: 14px; padding: 12px 16px; border-radius: var(--radius); font-size: 13px;
       line-height: 1.6; display: none;
     }
     .status-bar.loading { display: block; background: #f0f7ff; color: #1a6; }
     .status-bar.success { display: block; background: var(--green-light); color: var(--green); }
     .status-bar.error   { display: block; background: #fff0f0; color: #c00; }
 
-    /* ── 日志 & 管理 ── */
-    .section-card {
-      background: #fff; border-radius: 12px; padding: 24px 32px; margin-top: 20px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
-    }
-    .section-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--dark); }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); color: var(--gray); font-weight: 600; }
-    td { padding: 8px 10px; border-bottom: 1px solid var(--gray-light); }
+    /* ── 日志表格 ── */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 8px 8px; border-bottom: 2px solid var(--border); color: var(--gray); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+    td { padding: 8px 8px; border-bottom: 1px solid var(--gray-light); vertical-align: middle; }
     tr:hover td { background: #fafffe; }
-    .tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+    .tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; white-space: nowrap; }
     .tag-ok  { background: #e6f9e6; color: #270; }
     .tag-err { background: #fee; color: #a00; }
-    .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
-    .pagination button { padding: 4px 12px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; }
-    .pagination button.active { background: var(--green); color: #fff; border-color: var(--green); }
-    .empty { color: #bbb; font-size: 13px; text-align: center; padding: 24px; }
-
-    /* ── 管理面板 ── */
-    .admin-section { display: none; }
-    .admin-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
-    .admin-row input, .admin-row select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
-    .admin-row input:focus { border-color: var(--green); }
-    .btn-sm { padding: 7px 14px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; }
-    .btn-add { background: var(--green); color: #fff; }
-    .btn-add:hover { background: #356200; }
-    .btn-del { background: #fff; color: #d32; border: 1px solid #d32; padding: 3px 8px; font-size: 11px; }
-    .btn-del:hover { background: #fee; }
-    .chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-    .chip {
-      display: flex; align-items: center; gap: 6px; background: var(--green-light);
-      border: 1px solid var(--green-border); border-radius: 16px; padding: 4px 12px; font-size: 12px;
+    .tag-del { background: #f5f5f5; color: #999; }
+    .btn-del-draft {
+      padding: 3px 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;
+      color: var(--gray); font-size: 11px; cursor: pointer; white-space: nowrap;
     }
-    .chip .x { cursor: pointer; color: #999; font-size: 14px; }
-    .chip .x:hover { color: #d32; }
-    .chip .role-tag { font-size: 10px; color: var(--green); font-weight: 600; }
+    .btn-del-draft:hover { border-color: #d32; color: #d32; }
+    .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+    .pagination button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; }
+    .pagination button.active { background: var(--green); color: #fff; border-color: var(--green); }
+    .empty { color: #bbb; font-size: 13px; text-align: center; padding: 32px; }
+    .title-cell { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── 烟花 canvas ── */
+    #fireworks {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 9999;
+    }
   </style>
 </head>
 <body>
+
+  <canvas id="fireworks"></canvas>
 
   <!-- 登录 -->
   <div class="login-page" id="loginPage">
@@ -161,72 +165,47 @@
         <span>十字路口排版</span>
       </div>
       <div class="header-right">
+        <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">管理后台</a>
         <span class="username" id="displayName"></span>
         <span class="admin-badge" id="adminBadge" style="display:none">管理员</span>
         <button class="btn-text" onclick="doLogout()">退出</button>
       </div>
     </div>
 
-    <div class="main">
-      <!-- 发布 -->
-      <div class="publish-card">
-        <h2>发布文章到公众号</h2>
-        <div class="field">
-          <label>Notion / 飞书 公开链接</label>
-          <input type="text" class="url-input" id="urlInput" placeholder="粘贴文档的公开分享链接...">
-        </div>
-        <div class="row">
+    <div class="content">
+      <!-- 左栏：操作区 -->
+      <div class="col-left">
+        <div class="card">
+          <h2>发布文章</h2>
+          <div class="field">
+            <label>文档链接</label>
+            <input type="text" class="url-input" id="urlInput" placeholder="粘贴 Notion / 飞书 公开链接">
+          </div>
           <div class="field">
             <label>目标公众号</label>
             <select id="accountSelect"><option value="">加载中...</option></select>
           </div>
-          <div class="field">
-            <label>作者（可选）</label>
-            <input type="text" id="authorInput" placeholder="文章作者">
+          <div class="row">
+            <div class="field">
+              <label>作者</label>
+              <input type="text" id="authorInput" placeholder="可选">
+            </div>
+            <div class="field">
+              <label>摘要</label>
+              <input type="text" id="digestInput" placeholder="可选">
+            </div>
           </div>
+          <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
+          <div class="status-bar" id="status"></div>
         </div>
-        <div class="field">
-          <label>摘要（可选）</label>
-          <input type="text" id="digestInput" placeholder="默认自动截取正文前 54 字">
-        </div>
-        <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
-        <div class="status-bar" id="status"></div>
       </div>
 
-      <!-- 日志 -->
-      <div class="section-card">
-        <h3>操作记录</h3>
-        <div id="logsContainer"><div class="empty">暂无记录</div></div>
-        <div class="pagination" id="pagination"></div>
-      </div>
-
-      <!-- 管理面板（仅管理员可见）-->
-      <div class="section-card admin-section" id="adminSection">
-        <h3>管理面板</h3>
-
-        <div style="margin-bottom: 20px;">
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--gray)">公众号账号</div>
-          <div class="chip-list" id="accountChips"></div>
-          <div class="admin-row">
-            <input type="text" id="newAccName" placeholder="名称" style="width:120px">
-            <input type="text" id="newAccAppId" placeholder="AppID" style="width:180px">
-            <input type="text" id="newAccSecret" placeholder="AppSecret" style="flex:1;min-width:160px">
-            <button class="btn-sm btn-add" onclick="addAccount()">添加</button>
-          </div>
-        </div>
-
-        <div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--gray)">用户管理</div>
-          <div class="chip-list" id="userChips"></div>
-          <div class="admin-row">
-            <input type="text" id="newUserName" placeholder="用户名" style="width:120px">
-            <input type="password" id="newUserPass" placeholder="密码" style="width:150px">
-            <select id="newUserRole" style="width:100px">
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
-            </select>
-            <button class="btn-sm btn-add" onclick="addUser()">添加</button>
-          </div>
+      <!-- 右栏：日志区 -->
+      <div class="col-right">
+        <div class="card">
+          <h3>操作记录</h3>
+          <div id="logsContainer"><div class="empty">暂无记录</div></div>
+          <div class="pagination" id="pagination"></div>
         </div>
       </div>
     </div>
@@ -236,7 +215,6 @@
     let token = localStorage.getItem('token');
     let currentUser = null;
 
-    // ── API helper ──
     async function api(path, opts = {}) {
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
       if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -246,7 +224,6 @@
       return data;
     }
 
-    // ── 初始化 ──
     document.addEventListener('DOMContentLoaded', async () => {
       if (token) {
         try {
@@ -255,34 +232,22 @@
           showApp();
         } catch { logout(); }
       }
-      // 回车登录
-      document.getElementById('loginPass').addEventListener('keydown', e => {
-        if (e.key === 'Enter') doLogin();
-      });
+      document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
     });
 
-    // ── 登录/登出 ──
+    // ── 登录 ──
     async function doLogin() {
       const username = document.getElementById('loginUser').value.trim();
       const password = document.getElementById('loginPass').value;
       if (!username || !password) return;
-
       try {
-        const data = await api('/api/login', {
-          method: 'POST',
-          body: JSON.stringify({ username, password }),
-        });
+        const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
         if (data.ok) {
-          token = data.token;
-          currentUser = data.user;
+          token = data.token; currentUser = data.user;
           localStorage.setItem('token', token);
           showApp();
-        } else {
-          showLoginError(data.error);
-        }
-      } catch (e) {
-        showLoginError(e.message);
-      }
+        } else { showLoginError(data.error); }
+      } catch (e) { showLoginError(e.message); }
     }
 
     function doLogout() {
@@ -291,8 +256,7 @@
     }
 
     function logout() {
-      token = null;
-      currentUser = null;
+      token = null; currentUser = null;
       localStorage.removeItem('token');
       document.getElementById('loginPage').style.display = 'flex';
       document.getElementById('app').style.display = 'none';
@@ -300,19 +264,16 @@
 
     function showLoginError(msg) {
       const el = document.getElementById('loginError');
-      el.textContent = msg;
-      el.style.display = 'block';
+      el.textContent = msg; el.style.display = 'block';
     }
 
     function showApp() {
       document.getElementById('loginPage').style.display = 'none';
       document.getElementById('app').style.display = 'block';
       document.getElementById('displayName').textContent = currentUser.username;
-
       if (currentUser.role === 'admin') {
         document.getElementById('adminBadge').style.display = '';
-        document.getElementById('adminSection').style.display = '';
-        loadUsers();
+        document.getElementById('adminLink').style.display = '';
       }
       loadAccounts();
       loadLogs();
@@ -322,68 +283,9 @@
     async function loadAccounts() {
       const data = await api('/api/accounts');
       const select = document.getElementById('accountSelect');
-      const chips  = document.getElementById('accountChips');
-
       select.innerHTML = data.accounts.length
         ? data.accounts.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('')
         : '<option value="">暂无账号</option>';
-
-      if (currentUser.role === 'admin') {
-        chips.innerHTML = data.accounts.length
-          ? data.accounts.map(a => `<span class="chip">${esc(a.name)}<span class="x" onclick="removeAccount('${esc(a.name)}')">&times;</span></span>`).join('')
-          : '<span class="empty">暂无</span>';
-      }
-    }
-
-    async function addAccount() {
-      const name   = document.getElementById('newAccName').value.trim();
-      const appId  = document.getElementById('newAccAppId').value.trim();
-      const secret = document.getElementById('newAccSecret').value.trim();
-      if (!name || !appId || !secret) return alert('请填写完整');
-      const data = await api('/api/accounts', { method: 'POST', body: JSON.stringify({ name, appId, appSecret: secret }) });
-      if (data.ok) {
-        document.getElementById('newAccName').value = '';
-        document.getElementById('newAccAppId').value = '';
-        document.getElementById('newAccSecret').value = '';
-        loadAccounts();
-      } else { alert(data.error); }
-    }
-
-    async function removeAccount(name) {
-      if (!confirm(`删除公众号「${name}」？`)) return;
-      await api('/api/accounts/' + encodeURIComponent(name), { method: 'DELETE' });
-      loadAccounts();
-    }
-
-    // ── 用户 ──
-    async function loadUsers() {
-      const data = await api('/api/users');
-      const chips = document.getElementById('userChips');
-      chips.innerHTML = data.users.map(u => `
-        <span class="chip">
-          ${esc(u.username)} <span class="role-tag">${u.role}</span>
-          ${u.username !== 'admin' ? `<span class="x" onclick="removeUser('${esc(u.username)}')">&times;</span>` : ''}
-        </span>
-      `).join('');
-    }
-
-    async function addUser() {
-      const username = document.getElementById('newUserName').value.trim();
-      const password = document.getElementById('newUserPass').value;
-      const role     = document.getElementById('newUserRole').value;
-      if (!username || !password) return alert('用户名和密码必填');
-      const data = await api('/api/users', { method: 'POST', body: JSON.stringify({ username, password, role }) });
-      if (data.ok) {
-        document.getElementById('newUserName').value = '';
-        document.getElementById('newUserPass').value = '';
-        loadUsers();
-      } else { alert(data.error); }
-    }
-
-    async function removeUser(username) {
-      if (!confirm(`删除用户「${username}」？`)) return;
-      await api('/api/users/' + encodeURIComponent(username), { method: 'DELETE' });
-      loadUsers();
     }
 
     // ── 发布 ──
@@ -396,7 +298,7 @@
       if (!url) return alert('请输入链接');
       if (!accountName) return alert('请选择公众号');
 
-      setStatus('loading', '正在爬取文档并发布，可能需要 30 秒左右...');
+      setStatus('loading', '正在爬取文档并发布，请稍候...');
       document.getElementById('publishBtn').disabled = true;
 
       try {
@@ -406,6 +308,12 @@
         });
         if (data.ok) {
           setStatus('success', `发布成功！「${esc(data.title)}」已保存到草稿箱`);
+          // 清空输入，准备下一篇
+          document.getElementById('urlInput').value = '';
+          document.getElementById('authorInput').value = '';
+          document.getElementById('digestInput').value = '';
+          // 放烟花
+          launchFireworks();
         } else {
           setStatus('error', `失败: ${esc(data.error)}`);
         }
@@ -417,9 +325,27 @@
       }
     }
 
+    // ── 删除草稿 ──
+    async function deleteDraft(logId, accountName, mediaId) {
+      if (!confirm('确定从公众号草稿箱中删除这篇文章？')) return;
+      try {
+        const data = await api('/api/delete-draft', {
+          method: 'POST',
+          body: JSON.stringify({ logId, accountName, mediaId }),
+        });
+        if (data.ok) {
+          loadLogs();
+        } else {
+          alert('删除失败: ' + data.error);
+        }
+      } catch (e) {
+        alert('删除失败: ' + e.message);
+      }
+    }
+
     // ── 日志 ──
     async function loadLogs(page = 1) {
-      const data = await api(`/api/logs?page=${page}&pageSize=10`);
+      const data = await api(`/api/logs?page=${page}&pageSize=15`);
       const container  = document.getElementById('logsContainer');
       const pagination = document.getElementById('pagination');
 
@@ -430,15 +356,21 @@
       }
 
       container.innerHTML = `<table>
-        <thead><tr><th>时间</th><th>操作人</th><th>文章</th><th>公众号</th><th>状态</th></tr></thead>
+        <thead><tr><th>时间</th><th>操作人</th><th>文章</th><th>公众号</th><th>状态</th><th></th></tr></thead>
         <tbody>${data.rows.map(r => `<tr>
-          <td>${esc(r.created_at)}</td>
+          <td style="white-space:nowrap">${esc(r.created_at)}</td>
           <td>${esc(r.operator)}</td>
-          <td>${esc(r.title || '-')}</td>
+          <td class="title-cell" title="${esc(r.url)}">${esc(r.title || '-')}</td>
           <td>${esc(r.account_name)}</td>
           <td>${r.status === 'success'
             ? '<span class="tag tag-ok">成功</span>'
-            : `<span class="tag tag-err" title="${esc(r.error_msg)}">失败</span>`
+            : r.status === 'deleted'
+              ? '<span class="tag tag-del">已删除</span>'
+              : `<span class="tag tag-err" title="${esc(r.error_msg)}">失败</span>`
+          }</td>
+          <td>${r.status === 'success' && r.media_id
+            ? `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">删除草稿</button>`
+            : ''
           }</td>
         </tr>`).join('')}</tbody></table>`;
 
@@ -447,9 +379,68 @@
         pagination.innerHTML = Array.from({ length: Math.min(total, 10) }, (_, i) =>
           `<button class="${i + 1 === page ? 'active' : ''}" onclick="loadLogs(${i + 1})">${i + 1}</button>`
         ).join('');
-      } else {
-        pagination.innerHTML = '';
+      } else { pagination.innerHTML = ''; }
+    }
+
+    // ── 烟花特效 ──
+    function launchFireworks() {
+      const canvas = document.getElementById('fireworks');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6bff','#ffb347','#407600'];
+
+      // 创建多个发射点
+      for (let burst = 0; burst < 5; burst++) {
+        const cx = Math.random() * canvas.width * 0.6 + canvas.width * 0.2;
+        const cy = Math.random() * canvas.height * 0.3 + canvas.height * 0.1;
+        const count = 40 + Math.random() * 30;
+        for (let i = 0; i < count; i++) {
+          const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+          const speed = 2 + Math.random() * 4;
+          particles.push({
+            x: cx, y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.01 + Math.random() * 0.015,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            size: 2 + Math.random() * 2,
+            delay: burst * 8,
+          });
+        }
       }
+
+      let frame = 0;
+      function animate() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+
+        for (const p of particles) {
+          if (p.delay > 0) { p.delay--; alive = true; continue; }
+          if (p.life <= 0) continue;
+          alive = true;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.05; // 重力
+          p.vx *= 0.99;
+          p.life -= p.decay;
+
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        if (alive) requestAnimationFrame(animate);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      animate();
     }
 
     // ── 工具 ──

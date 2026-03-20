@@ -161,12 +161,29 @@ app.post('/api/publish', auth, async (req, res) => {
       digest: digest || '',
     });
 
-    db.addLog({ operator, url, title, accountName, status: 'success', errorMsg: '' });
+    db.addLog({ operator, url, title, accountName, mediaId: result.media_id, status: 'success', errorMsg: '' });
     res.json({ ok: true, title, media_id: result.media_id });
   } catch (e) {
     console.error('[Publish] 失败:', e.message);
-    db.addLog({ operator, url, title, accountName, status: 'error', errorMsg: e.message });
+    db.addLog({ operator, url, title, accountName, mediaId: '', status: 'error', errorMsg: e.message });
     res.status(500).json({ error: e.message, title });
+  }
+});
+
+// ── 删除草稿 ──
+
+app.post('/api/delete-draft', auth, async (req, res) => {
+  const { logId, accountName, mediaId } = req.body;
+  if (!mediaId || !accountName) return res.status(400).json({ error: '缺少参数' });
+
+  try {
+    const client = getWechatClient(accountName);
+    await client.deleteDraft(mediaId);
+    if (logId) db.updateLogStatus(logId, 'deleted', '');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[DeleteDraft] 失败:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 

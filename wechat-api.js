@@ -258,12 +258,26 @@ function createClient(appId, appSecret) {
     return { media_id: mediaId };
   }
 
+  async function deleteDraft(mediaId) {
+    const token = await getAccessToken();
+    const url   = `https://api.weixin.qq.com/cgi-bin/draft/delete?access_token=${token}`;
+    const res = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ media_id: mediaId }),
+    });
+    const data = await res.json();
+    if (data.errcode) throw new Error(`删除草稿失败: [${data.errcode}] ${data.errmsg}`);
+    console.log('[WeChat] 草稿已删除, media_id:', mediaId);
+  }
+
   return {
     getAccessToken,
     uploadArticleImage,
     uploadPermanentImage,
     uploadVideo,
     createDraft,
+    deleteDraft,
     processHtmlImages,
     processHtmlVideos,
     publishArticle,

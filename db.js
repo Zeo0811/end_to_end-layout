@@ -32,6 +32,7 @@ db.exec(`
     url          TEXT,
     title        TEXT,
     account_name TEXT,
+    media_id     TEXT,
     status       TEXT,
     error_msg    TEXT,
     created_at   TEXT DEFAULT (datetime('now'))
@@ -134,11 +135,19 @@ function removeAccount(name) {
 
 // ── 日志 ──
 
-function addLog({ operator, url, title, accountName, status, errorMsg }) {
+function addLog({ operator, url, title, accountName, mediaId, status, errorMsg }) {
   return db.prepare(`
-    INSERT INTO logs (operator, url, title, account_name, status, error_msg)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(operator || '', url || '', title || '', accountName || '', status || '', errorMsg || '');
+    INSERT INTO logs (operator, url, title, account_name, media_id, status, error_msg)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(operator || '', url || '', title || '', accountName || '', mediaId || '', status || '', errorMsg || '');
+}
+
+function updateLogStatus(id, status, errorMsg) {
+  return db.prepare('UPDATE logs SET status = ?, error_msg = ? WHERE id = ?').run(status, errorMsg || '', id);
+}
+
+function getLogById(id) {
+  return db.prepare('SELECT * FROM logs WHERE id = ?').get(id);
 }
 
 function getLogs(page = 1, pageSize = 20) {
@@ -161,5 +170,7 @@ module.exports = {
   addAccount,
   removeAccount,
   addLog,
+  updateLogStatus,
+  getLogById,
   getLogs,
 };

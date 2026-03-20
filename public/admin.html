@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 · 十字路口</title>
+  <link rel="icon" href="/logo.png">
+  <style>
+    :root {
+      --green: #407600;
+      --green-dark: #356200;
+      --green-light: #f4f9ed;
+      --green-border: #c5e0a5;
+      --dark: #1a1a1a;
+      --gray: #666;
+      --gray-light: #f7f7f7;
+      --border: #e5e5e5;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; background: #f0f2f5; color: var(--dark); min-height: 100vh; }
+
+    .header {
+      background: #fff; border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { width: 32px; height: 32px; border-radius: 8px; }
+    .header-left .title { font-size: 16px; font-weight: 700; color: var(--dark); }
+    .header-left .sub { font-size: 13px; color: var(--gray); margin-left: 8px; }
+    .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+    .btn-text { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 13px; text-decoration: none; }
+    .btn-text:hover { color: var(--dark); }
+
+    .main { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+
+    .card {
+      background: #fff; border-radius: 12px; padding: 28px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 20px;
+    }
+    .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--dark); display: flex; align-items: center; gap: 8px; }
+    .card h2 .count { font-size: 12px; font-weight: 500; color: var(--gray); background: var(--gray-light); padding: 2px 8px; border-radius: 10px; }
+
+    .item-list { margin-bottom: 16px; }
+    .item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 8px; transition: border .2s;
+    }
+    .item:hover { border-color: var(--green-border); }
+    .item-info { display: flex; align-items: center; gap: 10px; }
+    .item-name { font-size: 14px; font-weight: 600; }
+    .item-meta { font-size: 12px; color: var(--gray); }
+    .role-tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+    .role-admin { background: var(--green-light); color: var(--green); }
+    .role-user { background: #f0f0f0; color: var(--gray); }
+
+    .btn-del {
+      padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px;
+      background: #fff; color: var(--gray); font-size: 12px; cursor: pointer;
+    }
+    .btn-del:hover { border-color: #d32; color: #d32; background: #fff5f5; }
+
+    .add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .add-row input, .add-row select {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; outline: none; transition: border .2s;
+    }
+    .add-row input:focus { border-color: var(--green); }
+    .btn-add {
+      padding: 8px 16px; background: var(--green); color: #fff; border: none;
+      border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .btn-add:hover { background: var(--green-dark); }
+
+    .no-access {
+      display: flex; align-items: center; justify-content: center; min-height: 60vh;
+      font-size: 15px; color: var(--gray);
+    }
+  </style>
+</head>
+<body>
+  <div id="noAccess" class="no-access" style="display:none">
+    <div style="text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">🔒</div>
+      <div>需要管理员权限</div>
+      <a href="/" class="btn-text" style="margin-top:12px;display:inline-block">返回首页</a>
+    </div>
+  </div>
+
+  <div id="adminApp" style="display:none">
+    <div class="header">
+      <div class="header-left">
+        <img src="/logo.png" alt="Logo">
+        <span class="title">十字路口</span>
+        <span class="sub">管理后台</span>
+      </div>
+      <div class="header-right">
+        <a href="/" class="btn-text">返回首页</a>
+        <button class="btn-text" onclick="doLogout()">退出</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- 公众号管理 -->
+      <div class="card">
+        <h2>公众号账号 <span class="count" id="accountCount">0</span></h2>
+        <div class="item-list" id="accountList"></div>
+        <div class="add-row">
+          <input type="text" id="newAccName" placeholder="名称" style="width:120px">
+          <input type="text" id="newAccAppId" placeholder="AppID" style="width:180px">
+          <input type="text" id="newAccSecret" placeholder="AppSecret" style="flex:1;min-width:140px">
+          <button class="btn-add" onclick="addAccount()">添加</button>
+        </div>
+      </div>
+
+      <!-- 用户管理 -->
+      <div class="card">
+        <h2>用户管理 <span class="count" id="userCount">0</span></h2>
+        <div class="item-list" id="userList"></div>
+        <div class="add-row">
+          <input type="text" id="newUserName" placeholder="用户名" style="width:120px">
+          <input type="password" id="newUserPass" placeholder="密码" style="width:140px">
+          <select id="newUserRole" style="width:100px">
+            <option value="user">普通用户</option>
+            <option value="admin">管理员</option>
+          </select>
+          <button class="btn-add" onclick="addUser()">添加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let token = localStorage.getItem('token');
+
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch(path, { ...opts, headers });
+      const data = await res.json();
+      if (res.status === 401) { window.location.href = '/'; return; }
+      return data;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!token) { window.location.href = '/'; return; }
+      try {
+        const data = await api('/api/me');
+        if (data.user.role !== 'admin') {
+          document.getElementById('noAccess').style.display = 'flex';
+          return;
+        }
+        document.getElementById('adminApp').style.display = '';
+        loadAccounts();
+        loadUsers();
+      } catch {
+        window.location.href = '/';
+      }
+    });
+
+    function doLogout() {
+      api('/api/logout', { method: 'POST' }).catch(() => {});
+      localStorage.removeItem('token');
+      window.location.href = '/';
+    }
+
+    // ── 公众号 ──
+    async function loadAccounts() {
+      const data = await api('/api/accounts');
+      document.getElementById('accountCount').textContent = data.accounts.length;
+      document.getElementById('accountList').innerHTML = data.accounts.length
+        ? data.accounts.map(a => `
+          <div class="item">
+            <div class="item-info">
+              <span class="item-name">${esc(a.name)}</span>
+              <span class="item-meta">${esc(a.created_at)}</span>
+            </div>
+            <button class="btn-del" onclick="removeAccount('${esc(a.name)}')">删除</button>
+          </div>
+        `).join('')
+        : '<div style="color:#bbb;font-size:13px;padding:8px">暂无账号</div>';
+    }
+
+    async function addAccount() {
+      const name = document.getElementById('newAccName').value.trim();
+      const appId = document.getElementById('newAccAppId').value.trim();
+      const secret = document.getElementById('newAccSecret').value.trim();
+      if (!name || !appId || !secret) return alert('请填写完整');
+      const data = await api('/api/accounts', { method: 'POST', body: JSON.stringify({ name, appId, appSecret: secret }) });
+      if (data.ok) {
+        document.getElementById('newAccName').value = '';
+        document.getElementById('newAccAppId').value = '';
+        document.getElementById('newAccSecret').value = '';
+        loadAccounts();
+      } else { alert(data.error); }
+    }
+
+    async function removeAccount(name) {
+      if (!confirm(`确定删除公众号「${name}」？`)) return;
+      await api('/api/accounts/' + encodeURIComponent(name), { method: 'DELETE' });
+      loadAccounts();
+    }
+
+    // ── 用户 ──
+    async function loadUsers() {
+      const data = await api('/api/users');
+      document.getElementById('userCount').textContent = data.users.length;
+      document.getElementById('userList').innerHTML = data.users.map(u => `
+        <div class="item">
+          <div class="item-info">
+            <span class="item-name">${esc(u.username)}</span>
+            <span class="role-tag ${u.role === 'admin' ? 'role-admin' : 'role-user'}">${u.role === 'admin' ? '管理员' : '用户'}</span>
+            <span class="item-meta">${esc(u.created_at)}</span>
+          </div>
+          ${u.username !== 'admin' ? `<button class="btn-del" onclick="removeUser('${esc(u.username)}')">删除</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function addUser() {
+      const username = document.getElementById('newUserName').value.trim();
+      const password = document.getElementById('newUserPass').value;
+      const role = document.getElementById('newUserRole').value;
+      if (!username || !password) return alert('用户名和密码必填');
+      const data = await api('/api/users', { method: 'POST', body: JSON.stringify({ username, password, role }) });
+      if (data.ok) {
+        document.getElementById('newUserName').value = '';
+        document.getElementById('newUserPass').value = '';
+        loadUsers();
+      } else { alert(data.error); }
+    }
+
+    async function removeUser(username) {
+      if (!confirm(`确定删除用户「${username}」？`)) return;
+      await api('/api/users/' + encodeURIComponent(username), { method: 'DELETE' });
+      loadUsers();
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>
