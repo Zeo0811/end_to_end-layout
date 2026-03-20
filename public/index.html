@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>十字路口 · 公众号排版</title>
+  <title>十字路口·公众号排版</title>
   <link rel="icon" href="/logo.png">
   <style>
     :root {
@@ -54,18 +54,31 @@
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .header-left img { width: 32px; height: 32px; border-radius: 8px; }
-    .header-left span { font-size: 16px; font-weight: 700; color: var(--dark); }
+    .header-left .brand { font-size: 16px; font-weight: 700; color: var(--dark); }
+
+    /* Tab 导航 */
+    .header-tabs { display: flex; gap: 0; margin-left: 32px; height: 56px; }
+    .tab-btn {
+      background: none; border: none; cursor: pointer; padding: 0 20px; font-size: 14px;
+      color: #888; border-bottom: 3px solid transparent; transition: color .2s, border-color .2s; outline: none;
+    }
+    .tab-btn:hover { color: var(--green); }
+    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+
     .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--gray); }
     .header-right .username { font-weight: 600; color: var(--dark); }
     .header-right .admin-badge { background: var(--green); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
     .btn-text { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 13px; text-decoration: none; }
     .btn-text:hover { color: var(--dark); }
 
-    /* ── 双栏 ── */
+    /* Tab 面板 */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── 发布 Tab：双栏 ── */
     .content { display: flex; gap: 20px; max-width: 1200px; margin: 24px auto; padding: 0 24px; min-height: calc(100vh - 104px); }
     .col-left { flex: 0 0 420px; }
     .col-right { flex: 1; min-width: 0; }
-
     @media (max-width: 900px) {
       .content { flex-direction: column; }
       .col-left { flex: none; }
@@ -92,9 +105,6 @@
       border: 2px solid var(--border) !important; border-radius: 10px !important;
     }
     .url-input:focus { border-color: var(--green) !important; box-shadow: 0 0 0 3px rgba(64,118,0,.1); }
-
-    .row { display: flex; gap: 12px; }
-    .row .field { flex: 1; }
 
     .btn-publish {
       width: 100%; padding: 14px; background: var(--green); color: #fff; border: none;
@@ -132,7 +142,28 @@
     .empty { color: #bbb; font-size: 13px; text-align: center; padding: 32px; }
     .title-cell { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ── 烟花 canvas ── */
+    /* ── 样式预览 Tab ── */
+    #panel-preview { padding: 40px 24px; }
+    .preview-title { text-align: center; font-size: 20px; font-weight: bold; color: #333; margin-bottom: 6px; }
+    .preview-sub { text-align: center; font-size: 13px; color: #999; margin-bottom: 36px; }
+    .grid {
+      display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr);
+      max-width: 1400px; margin: 0 auto;
+    }
+    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px)  { .grid { grid-template-columns: 1fr; } }
+    .demo-block {
+      background: #fff; border-radius: 12px; padding: 24px 28px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07); min-width: 0; overflow: hidden;
+    }
+    .demo-label {
+      display: inline-block; background: #f4f4f4; border: 1px solid #e0e0e0; color: #666;
+      font-size: 11px; font-family: monospace; padding: 2px 8px; border-radius: 4px;
+      margin-bottom: 16px; letter-spacing: .5px;
+    }
+    .divider-line { border: none; border-top: 1px dashed #ddd; margin: 0 0 16px 0; }
+
+    /* ── 烟花 ── */
     #fireworks {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       pointer-events: none; z-index: 9999;
@@ -162,7 +193,11 @@
     <div class="header">
       <div class="header-left">
         <img src="/logo.png" alt="Logo">
-        <span>十字路口·公众号排版</span>
+        <span class="brand">十字路口·公众号排版</span>
+        <div class="header-tabs">
+          <button class="tab-btn active" onclick="switchTab('publish')">发布文章草稿</button>
+          <button class="tab-btn" onclick="switchTab('preview')">样式预览</button>
+        </div>
       </div>
       <div class="header-right">
         <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">管理后台</a>
@@ -172,46 +207,148 @@
       </div>
     </div>
 
-    <div class="content">
-      <!-- 左栏：操作区 -->
-      <div class="col-left">
-        <div class="card">
-          <h2>发布文章</h2>
-          <div class="field">
-            <label>文档链接</label>
-            <input type="text" class="url-input" id="urlInput" placeholder="粘贴 Notion / 飞书 公开链接">
-          </div>
-          <div class="field">
-            <label>目标公众号</label>
-            <select id="accountSelect"><option value="">加载中...</option></select>
-          </div>
-          <div class="row">
+    <!-- Tab 1: 发布 -->
+    <div class="tab-panel active" id="panel-publish">
+      <div class="content">
+        <div class="col-left">
+          <div class="card">
+            <h2>发布文章草稿</h2>
             <div class="field">
-              <label>作者</label>
-              <input type="text" id="authorInput" placeholder="可选">
+              <label>文档链接</label>
+              <input type="text" class="url-input" id="urlInput" placeholder="粘贴 Notion / 飞书 公开链接">
             </div>
             <div class="field">
-              <label>摘要</label>
-              <input type="text" id="digestInput" placeholder="可选">
+              <label>目标公众号</label>
+              <select id="accountSelect"><option value="">加载中...</option></select>
             </div>
+            <div class="field">
+              <label>作者（可选）</label>
+              <input type="text" id="authorInput" placeholder="文章显示的作者名">
+            </div>
+            <div class="field">
+              <label>摘要（可选）</label>
+              <input type="text" id="digestInput" placeholder="默认自动截取正文前 54 字">
+            </div>
+            <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
+            <div class="status-bar" id="status"></div>
           </div>
-          <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
-          <div class="status-bar" id="status"></div>
+        </div>
+        <div class="col-right">
+          <div class="card">
+            <h3>操作记录</h3>
+            <div id="logsContainer"><div class="empty">暂无记录</div></div>
+            <div class="pagination" id="pagination"></div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- 右栏：日志区 -->
-      <div class="col-right">
-        <div class="card">
-          <h3>操作记录</h3>
-          <div id="logsContainer"><div class="empty">暂无记录</div></div>
-          <div class="pagination" id="pagination"></div>
-        </div>
-      </div>
+    <!-- Tab 2: 样式预览 -->
+    <div class="tab-panel" id="panel-preview">
+      <div class="preview-title">样式预览</div>
+      <div class="preview-sub">以下为转换后发布到微信公众号的实际渲染效果</div>
+      <div class="grid" id="preview-grid"></div>
     </div>
   </div>
 
   <script>
+    // ══════════════════════════════════
+    //  样式预览数据
+    // ══════════════════════════════════
+    const FONT = "Optima-Regular, Optima, PingFangSC-light, PingFangTC-light, 'PingFang SC', Cambria, Cochin, Georgia, Times, 'Times New Roman', serif";
+    const MONO = 'Operator Mono, Consolas, Monaco, Menlo, monospace';
+
+    const PS = {
+      wrapper:           `font-family:${FONT};font-size:15px;color:rgb(63,63,63);line-height:1.75;letter-spacing:0.1em;word-wrap:break-word;`,
+      h1:                `display:block;line-height:1.5;font-size:24px;font-family:${FONT};font-weight:bold;margin:80px 0 40px 0;color:#407600;text-align:center;padding:0 1em;border-bottom:8px solid #407600;`,
+      h2:                `display:block;line-height:1.5;font-family:${FONT};font-size:20px;font-weight:bold;margin:40px 0;color:#222222;text-align:center;padding:0 0.2em;`,
+      h3:                `display:block;line-height:1.5;font-family:${FONT};font-size:17px;font-weight:bold;margin:40px 0;color:#222222;text-align:left;`,
+      h4:                `display:block;line-height:1.5;font-family:${FONT};font-size:16px;font-weight:bold;margin:1em 0 .5em;color:#222222;text-align:left;`,
+      h5:                `display:block;line-height:1.5;font-family:${FONT};font-size:15px;font-weight:bold;margin:.8em 0 .4em;color:#222222;text-align:left;`,
+      h6:                `display:block;line-height:1.5;font-family:${FONT};font-size:14px;font-weight:bold;margin:.7em 0 .35em;color:#555555;text-align:left;`,
+      p:                 `text-align:left;line-height:26px;font-family:${FONT};margin:0;padding-bottom:1em;letter-spacing:0.1em;white-space:pre-line;color:rgb(63,63,63);font-size:15px;`,
+      strong:            `word-break:break-all;font-weight:600;color:#407600;`,
+      em:                `font-style:italic;`,
+      code_inline:       `background:rgba(135,131,120,.15);border-radius:4px;font-size:85%;padding:0.2em 0.4em;color:#222222;font-family:${MONO};`,
+      s:                 `text-decoration:line-through;color:#888888;`,
+      blockquote_wrapper:`line-height:26px;word-spacing:normal;hyphens:auto;text-align:left;outline:0;max-width:100%;border-top:none;border-right:none;border-bottom:none;display:block;overflow:auto;padding:10px;margin:20px 0;border-left:8px solid #222222;background-color:#f5f5f5;font-family:${FONT};`,
+      blockquote_text:   `text-align:left;line-height:26px;font-family:${FONT};margin:0;letter-spacing:0.1em;color:#407600;font-size:15px;`,
+      callout_wrapper:   `font-size:15px;white-space:normal;margin:20px 0;color:#3f3f3f;font-family:${FONT};line-height:26px;letter-spacing:0.1em;background-color:#f9fdf5;border:1px solid #407600;border-radius:8px;padding:16px 20px;`,
+      code_wrapper:      `margin:20px 10px;display:block;width:calc(100% - 20px);box-sizing:border-box;font-size:15px;padding:10px;color:#333;position:relative;background-color:#fafafa;border:1px solid #f0f0f0;border-radius:5px;white-space:pre;box-shadow:rgba(0,0,0,.3) 0px 2px 10px;overflow-x:auto;text-align:left;font-family:${MONO};`,
+      code_lang_bar:     `font-size:11px;color:#999;font-family:${MONO};padding-bottom:6px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:1px solid #f0f0f0;margin-bottom:8px;`,
+      code_pre:          `margin:0;padding:0;overflow-x:auto;background:transparent;`,
+      code_text:         `font-family:${MONO};font-size:14px;line-height:1.65;white-space:pre;word-break:normal;display:block;color:#333;`,
+      hr:                `border-style:solid;border-width:1px 0 0;border-color:#797979;margin:15px 0;`,
+      ul:                `padding-left:1.5em;font-size:15px;line-height:1.75;font-family:${FONT};vertical-align:baseline;white-space:normal;color:rgb(63,63,63);margin-bottom:8px;margin-top:0;`,
+      ol:                `padding-left:1.5em;font-size:15px;line-height:26px;font-family:${FONT};vertical-align:baseline;white-space:normal;color:rgb(63,63,63);margin-bottom:8px;margin-top:0;`,
+      li_ul:             `font-size:15px;line-height:26px;font-family:${FONT};list-style-position:outside;list-style-type:disc;`,
+      li_ol:             `font-size:15px;line-height:1.75;font-family:${FONT};list-style-position:outside;list-style-type:decimal;`,
+      li_p:              `font-family:inherit;vertical-align:baseline;margin:10px 0;`,
+      img_wrapper:       `margin:15px 0;text-align:center;`,
+      img:               `max-width:100%;height:auto;border-radius:10px;display:inline-block;`,
+      img_caption:       `font-size:12px;color:#888888;margin-top:5px;text-align:center;`,
+      video_wrapper:     `margin:1em 0;background:#111;border-radius:8px;padding:28px 20px;text-align:center;`,
+      video_label:       `color:rgba(255,255,255,.45);font-size:14px;`,
+      toggle_summary:    `font-size:15px;font-weight:bold;color:#222222;margin:12px 0 5px;padding-left:15px;border-left:3px solid #222222;font-family:${FONT};`,
+      toggle_content:    `padding-left:15px;border-left:2px solid rgba(0,0,0,.15);margin-left:4px;`,
+      table_wrapper:     `overflow-x:auto;margin:1em 0;`,
+      table:             `border-collapse:collapse;width:100%;font-size:15px;line-height:1.6;font-family:${FONT};`,
+      th:                `background:rgba(0,0,0,.05);padding:7px 13px;border:1px solid rgba(0,0,0,.15);font-weight:bold;text-align:left;color:#222222;`,
+      td:                `padding:7px 13px;border:1px solid rgba(0,0,0,.15);color:#222222;`,
+      td_even:           `padding:7px 13px;border:1px solid rgba(0,0,0,.15);color:#222222;background:rgba(0,0,0,.02);`,
+      embed_wrapper:     `margin:1em 0;border:1px solid rgba(0,0,0,.1);padding:11px 15px;`,
+      embed_label:       `font-size:12px;color:#888888;margin-bottom:4px;`,
+      embed_link:        `font-size:13px;text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:break-all;`,
+      footnotes_wrapper: `margin-top:30px;padding-top:15px;border-top:1px solid rgba(0,0,0,.15);`,
+      footnotes_title:   `font-size:12px;font-weight:bold;color:#888888;margin-bottom:.6em;text-transform:uppercase;letter-spacing:1px;`,
+      footnote_item:     `font-size:12px;color:#555555;line-height:1.7;margin:.3em 0;word-break:break-all;`,
+      footnote_num:      `color:#222222;font-weight:bold;margin-right:4px;`,
+    };
+
+    function demoCard(label, html) {
+      return `<div class="demo-block"><span class="demo-label">${label}</span><hr class="divider-line"/><section style="${PS.wrapper}">${html}</section></div>`;
+    }
+
+    const dot = c => `<section style="width:10px;height:10px;border-radius:50%;background-color:${c};font-size:0;line-height:0;overflow:hidden;">&nbsp;</section>`;
+    const macBar = `<section style="display:flex;flex-direction:row;align-items:center;column-gap:6px;margin-bottom:4px;">${dot('#ed6c60')}${dot('#f7c151')}${dot('#64c856')}</section>`;
+
+    document.getElementById('preview-grid').innerHTML = [
+      demoCard('H1 · 一级标题', `<section style="${PS.h1}">这是一级标题 H1</section>`),
+      demoCard('H2 · 二级标题', `<section style="${PS.h2}">这是二级标题 H2</section>`),
+      demoCard('H3 · 三级标题', `<section style="${PS.h3}">这是三级标题 H3</section>`),
+      demoCard('H4 · 四级标题', `<section style="${PS.h4}">这是四级标题 H4</section>`),
+      demoCard('H5 · 五级标题', `<section style="${PS.h5}">这是五级标题 H5</section>`),
+      demoCard('H6 · 六级标题', `<section style="${PS.h6}">这是六级标题 H6</section>`),
+      demoCard('paragraph · 正文段落', `<p style="${PS.p}">这是一段正文内容，展示基础段落样式。字体使用 Optima / PingFang SC，字号 15px，行高 26px，字间距 0.1em。适合大段阅读文字。</p>`),
+      demoCard('paragraph · 行内格式', `<p style="${PS.p}">这句话包含 <strong style="${PS.strong}">加粗文字</strong>，也有 <em style="${PS.em}">斜体文字</em>，还有 <s style="${PS.s}">删除线文字</s>，以及 <code style="${PS.code_inline}">行内代码</code>，混排效果如上。</p>`),
+      demoCard('quote · 引用块', `<section style="${PS.blockquote_wrapper}"><p style="${PS.blockquote_text}">这是一段引用内容，左侧有 8px 黑色粗边框，背景为浅灰色。适合标注重要观点或引用他人话语。</p></section>`),
+      demoCard('callout · 高亮块', `<section style="${PS.callout_wrapper}">这是一个 Callout 高亮块，品牌绿描边圆角矩形，简约风格，适合强调注意事项或提示信息。</section>`),
+      demoCard('code · 代码块', `<section style="${PS.code_wrapper}">${macBar}<div style="${PS.code_lang_bar}">javascript</div><pre style="${PS.code_pre}"><code style="${PS.code_text}">function hello(name) {\n  console.log('Hello, ' + name + '!');\n  return name.toUpperCase();\n}</code></pre></section>`),
+      demoCard('divider · 分割线', `<p style="${PS.p}">分割线上方的正文内容。</p><section style="${PS.hr}"></section><p style="${PS.p}">分割线下方的正文内容。</p>`),
+      demoCard('bulleted_list · 无序列表', `<ul style="${PS.ul}"><li style="${PS.li_ul}"><p style="${PS.li_p}">第一个列表项，圆点样式</p></li><li style="${PS.li_ul}"><p style="${PS.li_p}">第二个列表项，正文字号</p></li><li style="${PS.li_ul}"><p style="${PS.li_p}">第三个列表项，支持 <strong style="${PS.strong}">加粗</strong> 等行内格式</p></li></ul>`),
+      demoCard('numbered_list · 有序列表', `<ol style="${PS.ol}"><li style="${PS.li_ol}"><p style="${PS.li_p}">第一步：打开飞书文档</p></li><li style="${PS.li_ol}"><p style="${PS.li_p}">第二步：点击插件图标</p></li><li style="${PS.li_ol}"><p style="${PS.li_p}">第三步：一键转换并复制</p></li></ol>`),
+      demoCard('todo · 待办事项', `<p style="${PS.p}">\u2610 未完成的待办事项</p><p style="${PS.p}">\u2705 已完成的待办事项</p>`),
+      demoCard('image · 图片', `<section style="${PS.img_wrapper}"><img src="https://picsum.photos/seed/demo/600/300" style="${PS.img}" alt="示例图片" /><p style="${PS.img_caption}">这是图片的说明文字（caption）</p></section>`),
+      demoCard('video · 视频占位', `<section style="${PS.video_wrapper}"><p style="${PS.video_label}">\uD83D\uDCF9 视频内容请前往原文查看</p></section>`),
+      demoCard('toggle · 折叠块', `<section style="${PS.toggle_summary}">\u25B6 折叠块标题（点击展开）</section><section style="${PS.toggle_content}"><p style="${PS.p}">折叠块内部的内容，在微信公众号中会展开显示，左侧有细灰线标示层级。</p></section>`),
+      demoCard('table · 表格', `<section style="${PS.table_wrapper}"><table style="${PS.table}"><tr><td style="${PS.th}">平台</td><td style="${PS.th}">支持格式</td><td style="${PS.th}">图片处理</td></tr><tr><td style="${PS.td_even}">飞书</td><td style="${PS.td_even}">文档 / Wiki</td><td style="${PS.td_even}">Base64 转换</td></tr><tr><td style="${PS.td}">Notion</td><td style="${PS.td}">Page</td><td style="${PS.td}">CDN 直链</td></tr></table></section>`),
+      demoCard('embed · 嵌入链接', `<section style="${PS.embed_wrapper}"><p style="${PS.embed_label}">\uD83D\uDCCE 嵌入内容</p><p style="${PS.embed_link}">https://github.com/Zeo0811/end_to_end-layout</p></section>`),
+      demoCard('footnotes · 脚注', `<p style="${PS.p}">这段文字引用了一个外部链接<sup style="font-size:.7em;color:#222222;font-weight:bold;line-height:0;vertical-align:super;">[1]</sup>，脚注会统一列在文末。</p><section style="${PS.footnotes_wrapper}"><p style="${PS.footnotes_title}">参考资料</p><p style="${PS.footnote_item}"><span style="${PS.footnote_num}">[1]</span>十字路口排版：<span style="color:#888888">https://github.com/Zeo0811/end_to_end-layout</span></p></section>`),
+    ].join('');
+
+    // ══════════════════════════════════
+    //  Tab 切换
+    // ══════════════════════════════════
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-' + name).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // ══════════════════════════════════
+    //  应用逻辑
+    // ══════════════════════════════════
     let token = localStorage.getItem('token');
     let currentUser = null;
 
@@ -235,7 +372,6 @@
       document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
     });
 
-    // ── 登录 ──
     async function doLogin() {
       const username = document.getElementById('loginUser').value.trim();
       const password = document.getElementById('loginPass').value;
@@ -279,7 +415,6 @@
       loadLogs();
     }
 
-    // ── 账号 ──
     async function loadAccounts() {
       const data = await api('/api/accounts');
       const select = document.getElementById('accountSelect');
@@ -288,7 +423,6 @@
         : '<option value="">暂无账号</option>';
     }
 
-    // ── 发布 ──
     async function doPublish() {
       const url         = document.getElementById('urlInput').value.trim();
       const accountName = document.getElementById('accountSelect').value;
@@ -308,11 +442,9 @@
         });
         if (data.ok) {
           setStatus('success', `发布成功！「${esc(data.title)}」已保存到草稿箱`);
-          // 清空输入，准备下一篇
           document.getElementById('urlInput').value = '';
           document.getElementById('authorInput').value = '';
           document.getElementById('digestInput').value = '';
-          // 放烟花
           launchFireworks();
         } else {
           setStatus('error', `失败: ${esc(data.error)}`);
@@ -325,7 +457,6 @@
       }
     }
 
-    // ── 删除草稿 ──
     async function deleteDraft(logId, accountName, mediaId) {
       if (!confirm('确定从公众号草稿箱中删除这篇文章？')) return;
       try {
@@ -333,17 +464,11 @@
           method: 'POST',
           body: JSON.stringify({ logId, accountName, mediaId }),
         });
-        if (data.ok) {
-          loadLogs();
-        } else {
-          alert('删除失败: ' + data.error);
-        }
-      } catch (e) {
-        alert('删除失败: ' + e.message);
-      }
+        if (data.ok) loadLogs();
+        else alert('删除失败: ' + data.error);
+      } catch (e) { alert('删除失败: ' + e.message); }
     }
 
-    // ── 日志 ──
     async function loadLogs(page = 1) {
       const data = await api(`/api/logs?page=${page}&pageSize=15`);
       const container  = document.getElementById('logsContainer');
@@ -382,7 +507,7 @@
       } else { pagination.innerHTML = ''; }
     }
 
-    // ── 烟花特效 ──
+    // ── 烟花 ──
     function launchFireworks() {
       const canvas = document.getElementById('fireworks');
       const ctx = canvas.getContext('2d');
@@ -392,7 +517,6 @@
       const particles = [];
       const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6bff','#ffb347','#407600'];
 
-      // 创建多个发射点
       for (let burst = 0; burst < 5; burst++) {
         const cx = Math.random() * canvas.width * 0.6 + canvas.width * 0.2;
         const cy = Math.random() * canvas.height * 0.3 + canvas.height * 0.1;
@@ -401,14 +525,10 @@
           const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
           const speed = 2 + Math.random() * 4;
           particles.push({
-            x: cx, y: cy,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1,
-            decay: 0.01 + Math.random() * 0.015,
+            x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            life: 1, decay: 0.01 + Math.random() * 0.015,
             color: colors[Math.floor(Math.random() * colors.length)],
-            size: 2 + Math.random() * 2,
-            delay: burst * 8,
+            size: 2 + Math.random() * 2, delay: burst * 8,
           });
         }
       }
@@ -418,24 +538,17 @@
         frame++;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         let alive = false;
-
         for (const p of particles) {
           if (p.delay > 0) { p.delay--; alive = true; continue; }
           if (p.life <= 0) continue;
           alive = true;
-          p.x += p.vx;
-          p.y += p.vy;
-          p.vy += 0.05; // 重力
-          p.vx *= 0.99;
-          p.life -= p.decay;
-
+          p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.vx *= 0.99; p.life -= p.decay;
           ctx.globalAlpha = Math.max(0, p.life);
           ctx.fillStyle = p.color;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
           ctx.fill();
         }
-
         ctx.globalAlpha = 1;
         if (alive) requestAnimationFrame(animate);
         else ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -443,7 +556,6 @@
       animate();
     }
 
-    // ── 工具 ──
     function setStatus(type, msg) {
       const el = document.getElementById('status');
       el.className = 'status-bar ' + type;
