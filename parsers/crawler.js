@@ -25,15 +25,35 @@ function detectPlatform(url) {
   return null;
 }
 
-// 将页面中所有 blob: 图片转为 base64 data URL
-async function convertBlobImages(page) {
+// 在页面上下文中将所有图片转为 base64 data URL
+// 包括 blob:、Notion 签名 URL 等服务端无法直接 fetch 的图片
+async function convertAllImages(page) {
   return page.evaluate(async () => {
     const imgs = document.querySelectorAll('img');
     for (const img of imgs) {
       const src = img.currentSrc || img.src || '';
-      if (!src.startsWith('blob:')) continue;
+      if (!src || src.startsWith('data:')) continue;
       try {
-        const resp = await fetch(src);
+        // 用 canvas 方式转换（利用浏览器已加载的图片缓存）
+        if (img.complete && img.naturalWidth > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            if (dataUrl && dataUrl.length > 100) {
+              img.src = dataUrl;
+              continue;
+            }
+          } catch (e) {
+            // canvas tainted by CORS, fallback to fetch
+          }
+        }
+        // fetch 方式（blob: URL 或需要 cookie 的 URL）
+        const resp = await fetch(src, { credentials: 'include' });
+        if (!resp.ok) continue;
         const blob = await resp.blob();
         const reader = new FileReader();
         const dataUrl = await new Promise((resolve, reject) => {
@@ -136,8 +156,8 @@ async function crawl(url) {
       await page.waitForTimeout(2000);
     }
 
-    // 转换 blob 图片
-    await convertBlobImages(page);
+    // 在浏览器上下文中将所有图片转为 base64（避免服务端 fetch 签名 URL 失败）
+    await convertAllImages(page);
 
     // 提取视频 URL（在解析之前，趁页面还活着）
     const pageVideos = await extractVideoUrls(page);

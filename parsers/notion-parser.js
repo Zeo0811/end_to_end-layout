@@ -347,8 +347,9 @@ function parseNotionImage(el) {
   const srcset   = imgEl.getAttribute('srcset') || imgEl.srcset || '';
   const srcsetFirst = srcset ? srcset.split(',')[0].trim().split(/\s+/)[0] : '';
 
+  // 优先使用 data: URL（由 crawler 预转换），其次用 http URL，跳过 blob:
   const src = [current, domSrc, attrSrc, srcsetFirst]
-    .find(s => s && !s.startsWith('blob:') && !s.startsWith('data:')) || '';
+    .find(s => s && !s.startsWith('blob:')) || '';
 
   if (!src) return null;
 
