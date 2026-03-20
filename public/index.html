@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公众号排版工具</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5; color: #333; min-height: 100vh;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 24px; color: #222; }
+    h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #444; }
+
+    /* 卡片 */
+    .card {
+      background: #fff; border-radius: 10px; padding: 20px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px;
+    }
+
+    /* 表单 */
+    .form-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+    .form-row label { font-size: 13px; color: #666; min-width: 60px; }
+    input[type="text"], select {
+      flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid #ddd;
+      border-radius: 6px; font-size: 14px; outline: none; transition: border .2s;
+    }
+    input[type="text"]:focus, select:focus { border-color: #407600; }
+    .btn {
+      padding: 9px 20px; border: none; border-radius: 6px; font-size: 14px;
+      cursor: pointer; transition: all .2s; font-weight: 500;
+    }
+    .btn-primary { background: #407600; color: #fff; }
+    .btn-primary:hover { background: #356200; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary { background: #eee; color: #333; }
+    .btn-secondary:hover { background: #ddd; }
+    .btn-danger { background: #fff; color: #d32; border: 1px solid #d32; padding: 4px 10px; font-size: 12px; }
+    .btn-danger:hover { background: #fdd; }
+
+    /* 状态 */
+    .status { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 13px; display: none; }
+    .status.loading { display: block; background: #f0f7ff; color: #1a6; }
+    .status.success { display: block; background: #f0fff0; color: #270; }
+    .status.error   { display: block; background: #fff0f0; color: #a00; }
+
+    /* 表格 */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #fafafa; font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 2px solid #eee; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+    tr:hover td { background: #fafffe; }
+    .tag-success { color: #270; background: #e6f9e6; padding: 2px 8px; border-radius: 3px; font-size: 12px; }
+    .tag-error   { color: #a00; background: #fee; padding: 2px 8px; border-radius: 3px; font-size: 12px; }
+
+    /* 账号管理 */
+    .account-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .account-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: #f0f7e6; border: 1px solid #c5e0a5; border-radius: 16px;
+      padding: 4px 12px; font-size: 13px;
+    }
+    .account-chip .remove { cursor: pointer; color: #999; font-size: 16px; line-height: 1; }
+    .account-chip .remove:hover { color: #d32; }
+
+    .empty { color: #aaa; font-size: 13px; padding: 20px; text-align: center; }
+    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+
+    /* 折叠 */
+    details summary { cursor: pointer; font-size: 14px; color: #666; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>公众号端到端排版</h1>
+
+    <!-- 发布表单 -->
+    <div class="card">
+      <h2>发布文章</h2>
+      <div class="form-row">
+        <label>链接</label>
+        <input type="text" id="urlInput" placeholder="粘贴 Notion 或飞书公开链接">
+      </div>
+      <div class="form-row">
+        <label>公众号</label>
+        <select id="accountSelect"><option value="">加载中...</option></select>
+      </div>
+      <div class="form-row">
+        <label>操作人</label>
+        <input type="text" id="operatorInput" placeholder="你的名字" style="max-width:200px">
+      </div>
+      <div class="form-row">
+        <label>作者</label>
+        <input type="text" id="authorInput" placeholder="文章显示的作者名（可选）" style="max-width:200px">
+      </div>
+      <div class="form-row">
+        <label>摘要</label>
+        <input type="text" id="digestInput" placeholder="文章摘要（可选，默认自动截取）">
+      </div>
+      <div class="form-row">
+        <button class="btn btn-primary" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
+        <button class="btn btn-secondary" onclick="doPreview()">仅预览</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <!-- 账号管理 -->
+    <div class="card">
+      <details>
+        <summary>公众号账号管理</summary>
+        <div class="account-list" id="accountList"></div>
+        <div class="form-row">
+          <input type="text" id="newAccountName" placeholder="名称" style="max-width:140px">
+          <input type="text" id="newAppId" placeholder="AppID" style="max-width:200px">
+          <input type="text" id="newAppSecret" placeholder="AppSecret">
+          <button class="btn btn-secondary" onclick="addAccount()">添加</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- 操作日志 -->
+    <div class="card">
+      <h2>操作日志</h2>
+      <div id="logsContainer"><div class="empty">暂无记录</div></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let currentPage = 1;
+
+    // ── 初始化 ──
+    document.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('operator');
+      if (saved) document.getElementById('operatorInput').value = saved;
+      loadAccounts();
+      loadLogs();
+    });
+
+    // ── 账号 ──
+    async function loadAccounts() {
+      try {
+        const res = await fetch(API + '/api/accounts');
+        const data = await res.json();
+        const select = document.getElementById('accountSelect');
+        const list   = document.getElementById('accountList');
+
+        select.innerHTML = data.accounts.length
+          ? data.accounts.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('')
+          : '<option value="">暂无账号，请先添加</option>';
+
+        list.innerHTML = data.accounts.length
+          ? data.accounts.map(a => `
+              <span class="account-chip">
+                ${esc(a.name)}
+                <span class="remove" onclick="removeAccount('${esc(a.name)}')">&times;</span>
+              </span>
+            `).join('')
+          : '<span class="empty">暂无账号</span>';
+      } catch (e) {
+        console.error('加载账号失败:', e);
+      }
+    }
+
+    async function addAccount() {
+      const name      = document.getElementById('newAccountName').value.trim();
+      const appId     = document.getElementById('newAppId').value.trim();
+      const appSecret = document.getElementById('newAppSecret').value.trim();
+      if (!name || !appId || !appSecret) return alert('请填写完整');
+
+      const res = await fetch(API + '/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, appId, appSecret }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('newAccountName').value = '';
+        document.getElementById('newAppId').value = '';
+        document.getElementById('newAppSecret').value = '';
+        loadAccounts();
+      } else {
+        alert(data.error || '添加失败');
+      }
+    }
+
+    async function removeAccount(name) {
+      if (!confirm(`确定删除 "${name}"？`)) return;
+      await fetch(API + '/api/accounts/' + encodeURIComponent(name), { method: 'DELETE' });
+      loadAccounts();
+    }
+
+    // ── 发布 ──
+    async function doPublish() {
+      const url         = document.getElementById('urlInput').value.trim();
+      const accountName = document.getElementById('accountSelect').value;
+      const operator    = document.getElementById('operatorInput').value.trim();
+      const author      = document.getElementById('authorInput').value.trim();
+      const digest      = document.getElementById('digestInput').value.trim();
+
+      if (!url) return alert('请输入链接');
+      if (!accountName) return alert('请选择公众号');
+
+      localStorage.setItem('operator', operator);
+      setStatus('loading', '正在爬取并发布，请稍候...');
+      document.getElementById('publishBtn').disabled = true;
+
+      try {
+        const res = await fetch(API + '/api/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, accountName, operator, author, digest }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setStatus('success', `发布成功！文章「${esc(data.title)}」已保存到草稿箱 (media_id: ${data.media_id})`);
+        } else {
+          setStatus('error', `发布失败: ${esc(data.error)}${data.title ? ` (文章: ${esc(data.title)})` : ''}`);
+        }
+      } catch (e) {
+        setStatus('error', `请求失败: ${e.message}`);
+      } finally {
+        document.getElementById('publishBtn').disabled = false;
+        loadLogs();
+      }
+    }
+
+    async function doPreview() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) return alert('请输入链接');
+
+      setStatus('loading', '正在爬取预览...');
+
+      try {
+        const res = await fetch(API + '/api/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setStatus('success', `预览成功！文章「${esc(data.title)}」共 ${data.blockCount} 个内容块`);
+          // 打开预览窗口
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>预览: ${esc(data.title)}</title>
+            <style>body{max-width:600px;margin:20px auto;padding:0 16px;}</style></head>
+            <body>${data.html}</body></html>`);
+          win.document.close();
+        } else {
+          setStatus('error', `预览失败: ${esc(data.error)}`);
+        }
+      } catch (e) {
+        setStatus('error', `请求失败: ${e.message}`);
+      }
+    }
+
+    // ── 日志 ──
+    async function loadLogs(page = 1) {
+      currentPage = page;
+      try {
+        const res  = await fetch(API + `/api/logs?page=${page}&pageSize=15`);
+        const data = await res.json();
+        const container  = document.getElementById('logsContainer');
+        const pagination = document.getElementById('pagination');
+
+        if (data.rows.length === 0) {
+          container.innerHTML = '<div class="empty">暂无记录</div>';
+          pagination.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = `
+          <table>
+            <thead><tr>
+              <th>时间</th><th>操作人</th><th>文章</th><th>公众号</th><th>状态</th>
+            </tr></thead>
+            <tbody>
+              ${data.rows.map(r => `
+                <tr>
+                  <td>${esc(r.created_at)}</td>
+                  <td>${esc(r.operator)}</td>
+                  <td title="${esc(r.url)}">${esc(r.title || '-')}</td>
+                  <td>${esc(r.account_name)}</td>
+                  <td>${r.status === 'success'
+                    ? '<span class="tag-success">成功</span>'
+                    : `<span class="tag-error" title="${esc(r.error_msg)}">失败</span>`
+                  }</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        const totalPages = Math.ceil(data.total / data.pageSize);
+        if (totalPages > 1) {
+          let btns = '';
+          for (let i = 1; i <= totalPages && i <= 10; i++) {
+            btns += `<button class="btn btn-secondary${i === page ? ' btn-primary' : ''}" onclick="loadLogs(${i})">${i}</button>`;
+          }
+          pagination.innerHTML = btns;
+        } else {
+          pagination.innerHTML = '';
+        }
+      } catch (e) {
+        console.error('加载日志失败:', e);
+      }
+    }
+
+    // ── 工具 ──
+    function setStatus(type, msg) {
+      const el = document.getElementById('status');
+      el.className = 'status ' + type;
+      el.textContent = msg;
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>
