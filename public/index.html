@@ -3,316 +3,460 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>公众号排版工具</title>
+  <title>十字路口 · 公众号排版</title>
+  <link rel="icon" href="/logo.png">
   <style>
+    :root {
+      --green: #407600;
+      --green-light: #f4f9ed;
+      --green-border: #c5e0a5;
+      --dark: #1a1a1a;
+      --gray: #666;
+      --gray-light: #f7f7f7;
+      --border: #e5e5e5;
+      --radius: 8px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5; color: #333; min-height: 100vh;
-    }
-    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
-    h1 { font-size: 22px; font-weight: 600; margin-bottom: 24px; color: #222; }
-    h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #444; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; background: #f0f2f5; color: var(--dark); min-height: 100vh; }
 
-    /* 卡片 */
-    .card {
-      background: #fff; border-radius: 10px; padding: 20px 24px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px;
+    /* ── 登录页 ── */
+    .login-page {
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+      background: linear-gradient(135deg, #f4f9ed 0%, #e8f0de 100%);
     }
-
-    /* 表单 */
-    .form-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
-    .form-row label { font-size: 13px; color: #666; min-width: 60px; }
-    input[type="text"], select {
-      flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid #ddd;
-      border-radius: 6px; font-size: 14px; outline: none; transition: border .2s;
+    .login-box {
+      background: #fff; border-radius: 16px; padding: 48px 40px; width: 380px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
     }
-    input[type="text"]:focus, select:focus { border-color: #407600; }
-    .btn {
-      padding: 9px 20px; border: none; border-radius: 6px; font-size: 14px;
-      cursor: pointer; transition: all .2s; font-weight: 500;
+    .login-box .logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 32px; }
+    .login-box .logo img { width: 48px; height: 48px; border-radius: 12px; }
+    .login-box .logo span { font-size: 20px; font-weight: 700; color: var(--dark); }
+    .login-box input {
+      width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 14px; outline: none; margin-bottom: 12px; transition: border .2s;
     }
-    .btn-primary { background: #407600; color: #fff; }
-    .btn-primary:hover { background: #356200; }
-    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
-    .btn-secondary { background: #eee; color: #333; }
-    .btn-secondary:hover { background: #ddd; }
-    .btn-danger { background: #fff; color: #d32; border: 1px solid #d32; padding: 4px 10px; font-size: 12px; }
-    .btn-danger:hover { background: #fdd; }
+    .login-box input:focus { border-color: var(--green); }
+    .login-box .btn-login {
+      width: 100%; padding: 12px; background: var(--green); color: #fff; border: none;
+      border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
+      margin-top: 8px; transition: background .2s;
+    }
+    .login-box .btn-login:hover { background: #356200; }
+    .login-box .error { color: #d32; font-size: 13px; margin-top: 8px; display: none; }
 
-    /* 状态 */
-    .status { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 13px; display: none; }
-    .status.loading { display: block; background: #f0f7ff; color: #1a6; }
-    .status.success { display: block; background: #f0fff0; color: #270; }
-    .status.error   { display: block; background: #fff0f0; color: #a00; }
+    /* ── 主布局 ── */
+    .app { display: none; }
+    .header {
+      background: #fff; border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { width: 32px; height: 32px; border-radius: 8px; }
+    .header-left span { font-size: 16px; font-weight: 700; color: var(--dark); }
+    .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--gray); }
+    .header-right .username { font-weight: 600; color: var(--dark); }
+    .header-right .admin-badge { background: var(--green); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .btn-text { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 13px; }
+    .btn-text:hover { color: var(--dark); }
 
-    /* 表格 */
+    .main { max-width: 720px; margin: 32px auto; padding: 0 16px; }
+
+    /* ── 发布卡片 ── */
+    .publish-card {
+      background: #fff; border-radius: 12px; padding: 32px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .publish-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 24px; color: var(--dark); }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 500; color: var(--gray); margin-bottom: 6px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 14px; outline: none; transition: border .2s; font-family: inherit;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--green); }
+    .url-input {
+      font-size: 16px !important; padding: 16px 18px !important;
+      border: 2px solid var(--border) !important; border-radius: 10px !important;
+    }
+    .url-input:focus { border-color: var(--green) !important; box-shadow: 0 0 0 3px rgba(64,118,0,.1); }
+    .row { display: flex; gap: 12px; }
+    .row .field { flex: 1; }
+
+    .btn-publish {
+      width: 100%; padding: 14px; background: var(--green); color: #fff; border: none;
+      border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
+      margin-top: 8px; transition: all .2s; letter-spacing: 0.5px;
+    }
+    .btn-publish:hover { background: #356200; }
+    .btn-publish:disabled { background: #ccc; cursor: not-allowed; }
+
+    .status-bar {
+      margin-top: 16px; padding: 12px 16px; border-radius: var(--radius); font-size: 13px;
+      line-height: 1.6; display: none;
+    }
+    .status-bar.loading { display: block; background: #f0f7ff; color: #1a6; }
+    .status-bar.success { display: block; background: var(--green-light); color: var(--green); }
+    .status-bar.error   { display: block; background: #fff0f0; color: #c00; }
+
+    /* ── 日志 & 管理 ── */
+    .section-card {
+      background: #fff; border-radius: 12px; padding: 24px 32px; margin-top: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .section-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--dark); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { background: #fafafa; font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 2px solid #eee; }
-    td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+    th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); color: var(--gray); font-weight: 600; }
+    td { padding: 8px 10px; border-bottom: 1px solid var(--gray-light); }
     tr:hover td { background: #fafffe; }
-    .tag-success { color: #270; background: #e6f9e6; padding: 2px 8px; border-radius: 3px; font-size: 12px; }
-    .tag-error   { color: #a00; background: #fee; padding: 2px 8px; border-radius: 3px; font-size: 12px; }
+    .tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+    .tag-ok  { background: #e6f9e6; color: #270; }
+    .tag-err { background: #fee; color: #a00; }
+    .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+    .pagination button { padding: 4px 12px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; }
+    .pagination button.active { background: var(--green); color: #fff; border-color: var(--green); }
+    .empty { color: #bbb; font-size: 13px; text-align: center; padding: 24px; }
 
-    /* 账号管理 */
-    .account-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-    .account-chip {
-      display: flex; align-items: center; gap: 6px;
-      background: #f0f7e6; border: 1px solid #c5e0a5; border-radius: 16px;
-      padding: 4px 12px; font-size: 13px;
+    /* ── 管理面板 ── */
+    .admin-section { display: none; }
+    .admin-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+    .admin-row input, .admin-row select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+    .admin-row input:focus { border-color: var(--green); }
+    .btn-sm { padding: 7px 14px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; }
+    .btn-add { background: var(--green); color: #fff; }
+    .btn-add:hover { background: #356200; }
+    .btn-del { background: #fff; color: #d32; border: 1px solid #d32; padding: 3px 8px; font-size: 11px; }
+    .btn-del:hover { background: #fee; }
+    .chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      display: flex; align-items: center; gap: 6px; background: var(--green-light);
+      border: 1px solid var(--green-border); border-radius: 16px; padding: 4px 12px; font-size: 12px;
     }
-    .account-chip .remove { cursor: pointer; color: #999; font-size: 16px; line-height: 1; }
-    .account-chip .remove:hover { color: #d32; }
-
-    .empty { color: #aaa; font-size: 13px; padding: 20px; text-align: center; }
-    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
-
-    /* 折叠 */
-    details summary { cursor: pointer; font-size: 14px; color: #666; margin-bottom: 10px; }
+    .chip .x { cursor: pointer; color: #999; font-size: 14px; }
+    .chip .x:hover { color: #d32; }
+    .chip .role-tag { font-size: 10px; color: var(--green); font-weight: 600; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>公众号端到端排版</h1>
 
-    <!-- 发布表单 -->
-    <div class="card">
-      <h2>发布文章</h2>
-      <div class="form-row">
-        <label>链接</label>
-        <input type="text" id="urlInput" placeholder="粘贴 Notion 或飞书公开链接">
+  <!-- 登录 -->
+  <div class="login-page" id="loginPage">
+    <div class="login-box">
+      <div class="logo">
+        <img src="/logo.png" alt="Logo">
+        <span>十字路口排版</span>
       </div>
-      <div class="form-row">
-        <label>公众号</label>
-        <select id="accountSelect"><option value="">加载中...</option></select>
+      <input type="text" id="loginUser" placeholder="用户名" autocomplete="username">
+      <input type="password" id="loginPass" placeholder="密码" autocomplete="current-password">
+      <button class="btn-login" onclick="doLogin()">登 录</button>
+      <div class="error" id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- 主应用 -->
+  <div class="app" id="app">
+    <div class="header">
+      <div class="header-left">
+        <img src="/logo.png" alt="Logo">
+        <span>十字路口排版</span>
       </div>
-      <div class="form-row">
-        <label>操作人</label>
-        <input type="text" id="operatorInput" placeholder="你的名字" style="max-width:200px">
+      <div class="header-right">
+        <span class="username" id="displayName"></span>
+        <span class="admin-badge" id="adminBadge" style="display:none">管理员</span>
+        <button class="btn-text" onclick="doLogout()">退出</button>
       </div>
-      <div class="form-row">
-        <label>作者</label>
-        <input type="text" id="authorInput" placeholder="文章显示的作者名（可选）" style="max-width:200px">
-      </div>
-      <div class="form-row">
-        <label>摘要</label>
-        <input type="text" id="digestInput" placeholder="文章摘要（可选，默认自动截取）">
-      </div>
-      <div class="form-row">
-        <button class="btn btn-primary" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
-        <button class="btn btn-secondary" onclick="doPreview()">仅预览</button>
-      </div>
-      <div class="status" id="status"></div>
     </div>
 
-    <!-- 账号管理 -->
-    <div class="card">
-      <details>
-        <summary>公众号账号管理</summary>
-        <div class="account-list" id="accountList"></div>
-        <div class="form-row">
-          <input type="text" id="newAccountName" placeholder="名称" style="max-width:140px">
-          <input type="text" id="newAppId" placeholder="AppID" style="max-width:200px">
-          <input type="text" id="newAppSecret" placeholder="AppSecret">
-          <button class="btn btn-secondary" onclick="addAccount()">添加</button>
+    <div class="main">
+      <!-- 发布 -->
+      <div class="publish-card">
+        <h2>发布文章到公众号</h2>
+        <div class="field">
+          <label>Notion / 飞书 公开链接</label>
+          <input type="text" class="url-input" id="urlInput" placeholder="粘贴文档的公开分享链接...">
         </div>
-      </details>
-    </div>
+        <div class="row">
+          <div class="field">
+            <label>目标公众号</label>
+            <select id="accountSelect"><option value="">加载中...</option></select>
+          </div>
+          <div class="field">
+            <label>作者（可选）</label>
+            <input type="text" id="authorInput" placeholder="文章作者">
+          </div>
+        </div>
+        <div class="field">
+          <label>摘要（可选）</label>
+          <input type="text" id="digestInput" placeholder="默认自动截取正文前 54 字">
+        </div>
+        <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
+        <div class="status-bar" id="status"></div>
+      </div>
 
-    <!-- 操作日志 -->
-    <div class="card">
-      <h2>操作日志</h2>
-      <div id="logsContainer"><div class="empty">暂无记录</div></div>
-      <div class="pagination" id="pagination"></div>
+      <!-- 日志 -->
+      <div class="section-card">
+        <h3>操作记录</h3>
+        <div id="logsContainer"><div class="empty">暂无记录</div></div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+      <!-- 管理面板（仅管理员可见）-->
+      <div class="section-card admin-section" id="adminSection">
+        <h3>管理面板</h3>
+
+        <div style="margin-bottom: 20px;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--gray)">公众号账号</div>
+          <div class="chip-list" id="accountChips"></div>
+          <div class="admin-row">
+            <input type="text" id="newAccName" placeholder="名称" style="width:120px">
+            <input type="text" id="newAccAppId" placeholder="AppID" style="width:180px">
+            <input type="text" id="newAccSecret" placeholder="AppSecret" style="flex:1;min-width:160px">
+            <button class="btn-sm btn-add" onclick="addAccount()">添加</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--gray)">用户管理</div>
+          <div class="chip-list" id="userChips"></div>
+          <div class="admin-row">
+            <input type="text" id="newUserName" placeholder="用户名" style="width:120px">
+            <input type="password" id="newUserPass" placeholder="密码" style="width:150px">
+            <select id="newUserRole" style="width:100px">
+              <option value="user">普通用户</option>
+              <option value="admin">管理员</option>
+            </select>
+            <button class="btn-sm btn-add" onclick="addUser()">添加</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    const API = '';
-    let currentPage = 1;
+    let token = localStorage.getItem('token');
+    let currentUser = null;
+
+    // ── API helper ──
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch(path, { ...opts, headers });
+      const data = await res.json();
+      if (res.status === 401) { logout(); throw new Error('登录已过期'); }
+      return data;
+    }
 
     // ── 初始化 ──
-    document.addEventListener('DOMContentLoaded', () => {
-      const saved = localStorage.getItem('operator');
-      if (saved) document.getElementById('operatorInput').value = saved;
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (token) {
+        try {
+          const data = await api('/api/me');
+          currentUser = data.user;
+          showApp();
+        } catch { logout(); }
+      }
+      // 回车登录
+      document.getElementById('loginPass').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
+      });
+    });
+
+    // ── 登录/登出 ──
+    async function doLogin() {
+      const username = document.getElementById('loginUser').value.trim();
+      const password = document.getElementById('loginPass').value;
+      if (!username || !password) return;
+
+      try {
+        const data = await api('/api/login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        if (data.ok) {
+          token = data.token;
+          currentUser = data.user;
+          localStorage.setItem('token', token);
+          showApp();
+        } else {
+          showLoginError(data.error);
+        }
+      } catch (e) {
+        showLoginError(e.message);
+      }
+    }
+
+    function doLogout() {
+      api('/api/logout', { method: 'POST' }).catch(() => {});
+      logout();
+    }
+
+    function logout() {
+      token = null;
+      currentUser = null;
+      localStorage.removeItem('token');
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('loginError');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function showApp() {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('displayName').textContent = currentUser.username;
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('adminBadge').style.display = '';
+        document.getElementById('adminSection').style.display = '';
+        loadUsers();
+      }
       loadAccounts();
       loadLogs();
-    });
+    }
 
     // ── 账号 ──
     async function loadAccounts() {
-      try {
-        const res = await fetch(API + '/api/accounts');
-        const data = await res.json();
-        const select = document.getElementById('accountSelect');
-        const list   = document.getElementById('accountList');
+      const data = await api('/api/accounts');
+      const select = document.getElementById('accountSelect');
+      const chips  = document.getElementById('accountChips');
 
-        select.innerHTML = data.accounts.length
-          ? data.accounts.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('')
-          : '<option value="">暂无账号，请先添加</option>';
+      select.innerHTML = data.accounts.length
+        ? data.accounts.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('')
+        : '<option value="">暂无账号</option>';
 
-        list.innerHTML = data.accounts.length
-          ? data.accounts.map(a => `
-              <span class="account-chip">
-                ${esc(a.name)}
-                <span class="remove" onclick="removeAccount('${esc(a.name)}')">&times;</span>
-              </span>
-            `).join('')
-          : '<span class="empty">暂无账号</span>';
-      } catch (e) {
-        console.error('加载账号失败:', e);
+      if (currentUser.role === 'admin') {
+        chips.innerHTML = data.accounts.length
+          ? data.accounts.map(a => `<span class="chip">${esc(a.name)}<span class="x" onclick="removeAccount('${esc(a.name)}')">&times;</span></span>`).join('')
+          : '<span class="empty">暂无</span>';
       }
     }
 
     async function addAccount() {
-      const name      = document.getElementById('newAccountName').value.trim();
-      const appId     = document.getElementById('newAppId').value.trim();
-      const appSecret = document.getElementById('newAppSecret').value.trim();
-      if (!name || !appId || !appSecret) return alert('请填写完整');
-
-      const res = await fetch(API + '/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, appId, appSecret }),
-      });
-      const data = await res.json();
+      const name   = document.getElementById('newAccName').value.trim();
+      const appId  = document.getElementById('newAccAppId').value.trim();
+      const secret = document.getElementById('newAccSecret').value.trim();
+      if (!name || !appId || !secret) return alert('请填写完整');
+      const data = await api('/api/accounts', { method: 'POST', body: JSON.stringify({ name, appId, appSecret: secret }) });
       if (data.ok) {
-        document.getElementById('newAccountName').value = '';
-        document.getElementById('newAppId').value = '';
-        document.getElementById('newAppSecret').value = '';
+        document.getElementById('newAccName').value = '';
+        document.getElementById('newAccAppId').value = '';
+        document.getElementById('newAccSecret').value = '';
         loadAccounts();
-      } else {
-        alert(data.error || '添加失败');
-      }
+      } else { alert(data.error); }
     }
 
     async function removeAccount(name) {
-      if (!confirm(`确定删除 "${name}"？`)) return;
-      await fetch(API + '/api/accounts/' + encodeURIComponent(name), { method: 'DELETE' });
+      if (!confirm(`删除公众号「${name}」？`)) return;
+      await api('/api/accounts/' + encodeURIComponent(name), { method: 'DELETE' });
       loadAccounts();
+    }
+
+    // ── 用户 ──
+    async function loadUsers() {
+      const data = await api('/api/users');
+      const chips = document.getElementById('userChips');
+      chips.innerHTML = data.users.map(u => `
+        <span class="chip">
+          ${esc(u.username)} <span class="role-tag">${u.role}</span>
+          ${u.username !== 'admin' ? `<span class="x" onclick="removeUser('${esc(u.username)}')">&times;</span>` : ''}
+        </span>
+      `).join('');
+    }
+
+    async function addUser() {
+      const username = document.getElementById('newUserName').value.trim();
+      const password = document.getElementById('newUserPass').value;
+      const role     = document.getElementById('newUserRole').value;
+      if (!username || !password) return alert('用户名和密码必填');
+      const data = await api('/api/users', { method: 'POST', body: JSON.stringify({ username, password, role }) });
+      if (data.ok) {
+        document.getElementById('newUserName').value = '';
+        document.getElementById('newUserPass').value = '';
+        loadUsers();
+      } else { alert(data.error); }
+    }
+
+    async function removeUser(username) {
+      if (!confirm(`删除用户「${username}」？`)) return;
+      await api('/api/users/' + encodeURIComponent(username), { method: 'DELETE' });
+      loadUsers();
     }
 
     // ── 发布 ──
     async function doPublish() {
       const url         = document.getElementById('urlInput').value.trim();
       const accountName = document.getElementById('accountSelect').value;
-      const operator    = document.getElementById('operatorInput').value.trim();
       const author      = document.getElementById('authorInput').value.trim();
       const digest      = document.getElementById('digestInput').value.trim();
 
       if (!url) return alert('请输入链接');
       if (!accountName) return alert('请选择公众号');
 
-      localStorage.setItem('operator', operator);
-      setStatus('loading', '正在爬取并发布，请稍候...');
+      setStatus('loading', '正在爬取文档并发布，可能需要 30 秒左右...');
       document.getElementById('publishBtn').disabled = true;
 
       try {
-        const res = await fetch(API + '/api/publish', {
+        const data = await api('/api/publish', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, accountName, operator, author, digest }),
+          body: JSON.stringify({ url, accountName, author, digest }),
         });
-        const data = await res.json();
         if (data.ok) {
-          setStatus('success', `发布成功！文章「${esc(data.title)}」已保存到草稿箱 (media_id: ${data.media_id})`);
+          setStatus('success', `发布成功！「${esc(data.title)}」已保存到草稿箱`);
         } else {
-          setStatus('error', `发布失败: ${esc(data.error)}${data.title ? ` (文章: ${esc(data.title)})` : ''}`);
+          setStatus('error', `失败: ${esc(data.error)}`);
         }
       } catch (e) {
-        setStatus('error', `请求失败: ${e.message}`);
+        setStatus('error', `请求异常: ${e.message}`);
       } finally {
         document.getElementById('publishBtn').disabled = false;
         loadLogs();
       }
     }
 
-    async function doPreview() {
-      const url = document.getElementById('urlInput').value.trim();
-      if (!url) return alert('请输入链接');
-
-      setStatus('loading', '正在爬取预览...');
-
-      try {
-        const res = await fetch(API + '/api/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setStatus('success', `预览成功！文章「${esc(data.title)}」共 ${data.blockCount} 个内容块`);
-          // 打开预览窗口
-          const win = window.open('', '_blank');
-          win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>预览: ${esc(data.title)}</title>
-            <style>body{max-width:600px;margin:20px auto;padding:0 16px;}</style></head>
-            <body>${data.html}</body></html>`);
-          win.document.close();
-        } else {
-          setStatus('error', `预览失败: ${esc(data.error)}`);
-        }
-      } catch (e) {
-        setStatus('error', `请求失败: ${e.message}`);
-      }
-    }
-
     // ── 日志 ──
     async function loadLogs(page = 1) {
-      currentPage = page;
-      try {
-        const res  = await fetch(API + `/api/logs?page=${page}&pageSize=15`);
-        const data = await res.json();
-        const container  = document.getElementById('logsContainer');
-        const pagination = document.getElementById('pagination');
+      const data = await api(`/api/logs?page=${page}&pageSize=10`);
+      const container  = document.getElementById('logsContainer');
+      const pagination = document.getElementById('pagination');
 
-        if (data.rows.length === 0) {
-          container.innerHTML = '<div class="empty">暂无记录</div>';
-          pagination.innerHTML = '';
-          return;
-        }
+      if (!data.rows.length) {
+        container.innerHTML = '<div class="empty">暂无记录</div>';
+        pagination.innerHTML = '';
+        return;
+      }
 
-        container.innerHTML = `
-          <table>
-            <thead><tr>
-              <th>时间</th><th>操作人</th><th>文章</th><th>公众号</th><th>状态</th>
-            </tr></thead>
-            <tbody>
-              ${data.rows.map(r => `
-                <tr>
-                  <td>${esc(r.created_at)}</td>
-                  <td>${esc(r.operator)}</td>
-                  <td title="${esc(r.url)}">${esc(r.title || '-')}</td>
-                  <td>${esc(r.account_name)}</td>
-                  <td>${r.status === 'success'
-                    ? '<span class="tag-success">成功</span>'
-                    : `<span class="tag-error" title="${esc(r.error_msg)}">失败</span>`
-                  }</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `;
+      container.innerHTML = `<table>
+        <thead><tr><th>时间</th><th>操作人</th><th>文章</th><th>公众号</th><th>状态</th></tr></thead>
+        <tbody>${data.rows.map(r => `<tr>
+          <td>${esc(r.created_at)}</td>
+          <td>${esc(r.operator)}</td>
+          <td>${esc(r.title || '-')}</td>
+          <td>${esc(r.account_name)}</td>
+          <td>${r.status === 'success'
+            ? '<span class="tag tag-ok">成功</span>'
+            : `<span class="tag tag-err" title="${esc(r.error_msg)}">失败</span>`
+          }</td>
+        </tr>`).join('')}</tbody></table>`;
 
-        const totalPages = Math.ceil(data.total / data.pageSize);
-        if (totalPages > 1) {
-          let btns = '';
-          for (let i = 1; i <= totalPages && i <= 10; i++) {
-            btns += `<button class="btn btn-secondary${i === page ? ' btn-primary' : ''}" onclick="loadLogs(${i})">${i}</button>`;
-          }
-          pagination.innerHTML = btns;
-        } else {
-          pagination.innerHTML = '';
-        }
-      } catch (e) {
-        console.error('加载日志失败:', e);
+      const total = Math.ceil(data.total / data.pageSize);
+      if (total > 1) {
+        pagination.innerHTML = Array.from({ length: Math.min(total, 10) }, (_, i) =>
+          `<button class="${i + 1 === page ? 'active' : ''}" onclick="loadLogs(${i + 1})">${i + 1}</button>`
+        ).join('');
+      } else {
+        pagination.innerHTML = '';
       }
     }
 
     // ── 工具 ──
     function setStatus(type, msg) {
       const el = document.getElementById('status');
-      el.className = 'status ' + type;
-      el.textContent = msg;
+      el.className = 'status-bar ' + type;
+      el.innerHTML = msg;
     }
 
     function esc(s) {

@@ -7,7 +7,6 @@ const path = require('path');
 
 let browser = null;
 
-// 读取 parser 源码（注入到页面 evaluate 中执行）
 const notionParserCode = fs.readFileSync(path.join(__dirname, 'notion-parser.js'), 'utf8');
 const feishuParserCode = fs.readFileSync(path.join(__dirname, 'feishu-parser.js'), 'utf8');
 
@@ -43,10 +42,51 @@ async function convertBlobImages(page) {
           reader.readAsDataURL(blob);
         });
         img.src = dataUrl;
-      } catch (e) {
-        // blob 失效则跳过
-      }
+      } catch (e) {}
     }
+  });
+}
+
+// 从页面中提取视频的真实 URL（处理 Notion 延迟加载和各种视频容器）
+async function extractVideoUrls(page) {
+  return page.evaluate(() => {
+    const videos = [];
+
+    // 1. 直接的 <video> 元素
+    document.querySelectorAll('video').forEach(v => {
+      const src = v.src || v.getAttribute('src') || '';
+      const poster = v.poster || v.getAttribute('poster') || '';
+      // 也检查 <source> 子元素
+      const sourceEl = v.querySelector('source');
+      const sourceSrc = sourceEl ? (sourceEl.src || sourceEl.getAttribute('src') || '') : '';
+      const url = src || sourceSrc;
+      if (url) videos.push({ url, poster });
+    });
+
+    // 2. Notion 的 video block 可能用 iframe 嵌入
+    document.querySelectorAll('iframe').forEach(iframe => {
+      const src = iframe.src || iframe.getAttribute('src') || '';
+      if (src.includes('file.notion.so') || src.includes('videos')) {
+        videos.push({ url: src, poster: '' });
+      }
+    });
+
+    // 3. 从 Notion 的 data 属性中找视频 URL
+    document.querySelectorAll('[data-block-type="video"], [class*="notion-video"]').forEach(el => {
+      // 检查 a 标签链接
+      const link = el.querySelector('a[href*="file.notion.so"]');
+      if (link) {
+        videos.push({ url: link.href, poster: '' });
+      }
+      // 检查 data-* 属性
+      for (const attr of el.attributes) {
+        if (attr.value && attr.value.includes('file.notion.so') && !videos.find(v => v.url === attr.value)) {
+          videos.push({ url: attr.value, poster: '' });
+        }
+      }
+    });
+
+    return videos;
   });
 }
 
@@ -63,21 +103,32 @@ async function crawl(url) {
   });
   const page = await context.newPage();
 
+  // 拦截并记录所有视频相关的请求 URL
+  const videoRequestUrls = [];
+  page.on('response', response => {
+    const resUrl = response.url();
+    const contentType = response.headers()['content-type'] || '';
+    if (contentType.includes('video') || resUrl.match(/\.(mp4|mov|webm|avi)/i) ||
+        (resUrl.includes('file.notion.so') && resUrl.includes('mov'))) {
+      videoRequestUrls.push(resUrl);
+    }
+  });
+
   try {
     console.log(`[Crawler] 打开 ${platform} 页面: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // 等待内容渲染
     if (platform === 'notion') {
-      // Notion 页面：等待内容区域出现
       await page.waitForSelector(
         '.notion-page-content, [data-content-editable-root], [class*="layout-content"]',
         { timeout: 15000 }
       ).catch(() => {});
-      // 额外等待动态加载
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
+
+      // 滚动页面确保所有内容（包括视频）都加载
+      await autoScroll(page);
+      await page.waitForTimeout(1000);
     } else {
-      // 飞书页面：等待 block 出现
       await page.waitForSelector(
         '[data-block-type="page"], .lark-ck-editor, [class*="docx-content"]',
         { timeout: 15000 }
@@ -88,6 +139,10 @@ async function crawl(url) {
     // 转换 blob 图片
     await convertBlobImages(page);
 
+    // 提取视频 URL（在解析之前，趁页面还活着）
+    const pageVideos = await extractVideoUrls(page);
+    console.log(`[Crawler] 页面中发现 ${pageVideos.length} 个视频, 网络请求中发现 ${videoRequestUrls.length} 个视频 URL`);
+
     let result;
 
     if (platform === 'notion') {
@@ -96,30 +151,56 @@ async function crawl(url) {
         return parseNotion();
       }, notionParserCode);
     } else {
-      // 飞书：先用 scrollAndCollect 处理虚拟滚动，再组装结果
       result = await page.evaluate(async (parserCode) => {
         eval(parserCode);
-        // scrollAndCollect 是异步的（处理虚拟滚动）
         if (typeof scrollAndCollect === 'function') {
           const sc = await scrollAndCollect();
           const title = getFeishuTitle();
           return { type: 'feishu', title, blocks: sc.blocks, links: sc.links };
         }
-        // 降级：直接用同步解析
         return parseFeishu();
       }, feishuParserCode);
     }
 
-    // 解析完成后再处理一次图片（parser 可能更新了 src）
-    // 将 blocks 中的图片 URL 替换：如果是相对路径或特殊协议，尝试转为绝对 URL
+    // 后处理：修复视频和图片 URL
     if (result && result.blocks) {
+      let videoIndex = 0;
       for (const block of result.blocks) {
+        // 修复图片相对路径
         if (block.type === 'image' && block.url) {
-          // 将相对 URL 补全
           if (block.url.startsWith('/')) {
             const base = new URL(url);
             block.url = base.origin + block.url;
           }
+        }
+
+        // 修复视频 URL：如果 parser 没拿到有效 URL，从页面提取和网络请求中补充
+        if (block.type === 'video') {
+          const hasValidUrl = block.url && block.url.startsWith('http') && !block.url.startsWith('blob:');
+
+          if (!hasValidUrl) {
+            // 优先用页面提取到的视频 URL
+            if (pageVideos[videoIndex]) {
+              block.url = pageVideos[videoIndex].url;
+              if (!block.thumbnailUrl && pageVideos[videoIndex].poster) {
+                block.thumbnailUrl = pageVideos[videoIndex].poster;
+              }
+            }
+            // 其次用网络请求中捕获的视频 URL
+            else if (videoRequestUrls[videoIndex]) {
+              block.url = videoRequestUrls[videoIndex];
+            }
+          }
+
+          // 确保缩略图也有有效 URL
+          if (!block.thumbnailUrl || block.thumbnailUrl.startsWith('blob:')) {
+            if (pageVideos[videoIndex] && pageVideos[videoIndex].poster) {
+              block.thumbnailUrl = pageVideos[videoIndex].poster;
+            }
+          }
+
+          console.log(`[Crawler] 视频 #${videoIndex}: url=${(block.url || '').slice(0, 80)}...`);
+          videoIndex++;
         }
       }
     }
@@ -129,6 +210,25 @@ async function crawl(url) {
   } finally {
     await context.close();
   }
+}
+
+// 自动滚动页面，触发懒加载内容
+async function autoScroll(page) {
+  await page.evaluate(async () => {
+    await new Promise(resolve => {
+      let totalHeight = 0;
+      const distance = 500;
+      const timer = setInterval(() => {
+        window.scrollBy(0, distance);
+        totalHeight += distance;
+        if (totalHeight >= document.body.scrollHeight) {
+          window.scrollTo(0, 0);
+          clearInterval(timer);
+          resolve();
+        }
+      }, 200);
+    });
+  });
 }
 
 async function closeBrowser() {
