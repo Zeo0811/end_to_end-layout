@@ -1,0 +1,98 @@
+{
+  "name": "wechat-publisher",
+  "description": "将 Notion/飞书文档一键发布到微信公众号草稿箱",
+  "version": "1.0.0",
+  "api": {
+    "baseUrl": "${SKILL_BASE_URL}",
+    "auth": {
+      "type": "bearer",
+      "loginEndpoint": "/api/login",
+      "loginBody": {
+        "username": "${SKILL_USERNAME}",
+        "password": "${SKILL_PASSWORD}"
+      },
+      "tokenPath": "token"
+    },
+    "endpoints": {
+      "publish": {
+        "method": "POST",
+        "path": "/api/publish",
+        "description": "将 Notion 或飞书公开链接的文档发布到微信公众号草稿箱。返回 SSE 流式进度。",
+        "parameters": {
+          "url": {
+            "type": "string",
+            "required": true,
+            "description": "Notion 或飞书的公开分享链接"
+          },
+          "accountName": {
+            "type": "string",
+            "required": true,
+            "description": "目标公众号名称（需提前在管理后台配置）"
+          },
+          "author": {
+            "type": "string",
+            "required": false,
+            "description": "文章显示的作者名"
+          },
+          "digest": {
+            "type": "string",
+            "required": false,
+            "description": "文章摘要，默认自动截取正文前 54 字"
+          }
+        },
+        "response": {
+          "streaming": true,
+          "format": "text/event-stream",
+          "events": {
+            "progress": "{ type: 'progress', step, percent, msg }",
+            "done": "{ type: 'done', ok, title, media_id } | { type: 'done', ok: false, error }"
+          }
+        }
+      },
+      "listAccounts": {
+        "method": "GET",
+        "path": "/api/accounts",
+        "description": "获取已配置的公众号列表"
+      },
+      "deleteDraft": {
+        "method": "POST",
+        "path": "/api/delete-draft",
+        "description": "从公众号草稿箱删除指定文章",
+        "parameters": {
+          "logId": { "type": "number", "required": false },
+          "accountName": { "type": "string", "required": true },
+          "mediaId": { "type": "string", "required": true }
+        }
+      },
+      "getLogs": {
+        "method": "GET",
+        "path": "/api/logs",
+        "description": "获取发布操作日志",
+        "parameters": {
+          "page": { "type": "number", "required": false, "default": 1 },
+          "pageSize": { "type": "number", "required": false, "default": 20 }
+        }
+      }
+    }
+  },
+  "usage": {
+    "examples": [
+      {
+        "prompt": "把这篇 Notion 文档发到十字路口公众号",
+        "action": "publish",
+        "params": {
+          "url": "https://xxx.notion.site/xxx",
+          "accountName": "十字路口"
+        }
+      },
+      {
+        "prompt": "查看最近的发布记录",
+        "action": "getLogs"
+      },
+      {
+        "prompt": "有哪些公众号可以发布",
+        "action": "listAccounts"
+      }
+    ]
+  }
+}
