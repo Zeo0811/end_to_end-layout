@@ -166,13 +166,22 @@
     /* ── 烟花 ── */
     #fireworks {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 9999;
+      z-index: 9999; cursor: pointer; display: none;
+      background: rgba(0,0,0,.3);
     }
+    #fireworks.active { display: block; }
+    .fw-hint {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,.6); font-size: 14px; z-index: 10000;
+      pointer-events: none; display: none; letter-spacing: 1px;
+    }
+    #fireworks.active + .fw-hint { display: block; }
   </style>
 </head>
 <body>
 
-  <canvas id="fireworks"></canvas>
+  <canvas id="fireworks" onclick="stopFireworks()"></canvas>
+  <div class="fw-hint">点击任意位置关闭</div>
 
   <!-- 登录 -->
   <div class="login-page" id="loginPage">
@@ -183,7 +192,7 @@
       </div>
       <input type="text" id="loginUser" placeholder="用户名" autocomplete="username">
       <input type="password" id="loginPass" placeholder="密码" autocomplete="current-password">
-      <button class="btn-login" onclick="doLogin()">登 录</button>
+      <button class="btn-login" onclick="doLogin()">&#x1F513; 登 录</button>
       <div class="error" id="loginError"></div>
     </div>
   </div>
@@ -195,15 +204,15 @@
         <img src="/logo.png" alt="Logo">
         <span class="brand">十字路口·公众号排版</span>
         <div class="header-tabs">
-          <button class="tab-btn active" onclick="switchTab('publish')">发布文章草稿</button>
-          <button class="tab-btn" onclick="switchTab('preview')">样式预览</button>
+          <button class="tab-btn active" onclick="switchTab('publish')">&#x1F4E4; 发布文章草稿</button>
+          <button class="tab-btn" onclick="switchTab('preview')">&#x1F3A8; 样式预览</button>
         </div>
       </div>
       <div class="header-right">
-        <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">管理后台</a>
+        <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">&#x2699;&#xFE0F; 管理后台</a>
         <span class="username" id="displayName"></span>
         <span class="admin-badge" id="adminBadge" style="display:none">管理员</span>
-        <button class="btn-text" onclick="doLogout()">退出</button>
+        <button class="btn-text" onclick="doLogout()">&#x1F6AA; 退出</button>
       </div>
     </div>
 
@@ -229,7 +238,7 @@
               <label>摘要（可选）</label>
               <input type="text" id="digestInput" placeholder="默认自动截取正文前 54 字">
             </div>
-            <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
+            <button class="btn-publish" id="publishBtn" onclick="doPublish()">&#x1F680; 发布到草稿箱</button>
             <div class="status-bar" id="status"></div>
           </div>
         </div>
@@ -432,7 +441,7 @@
       if (!url) return alert('请输入链接');
       if (!accountName) return alert('请选择公众号');
 
-      setStatus('loading', '正在爬取文档并发布，请稍候...');
+      setStatus('loading', '\u23F3 正在爬取文档并发布，请稍候...');
       document.getElementById('publishBtn').disabled = true;
 
       try {
@@ -441,7 +450,7 @@
           body: JSON.stringify({ url, accountName, author, digest }),
         });
         if (data.ok) {
-          setStatus('success', `发布成功！「${esc(data.title)}」已保存到草稿箱`);
+          setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
           document.getElementById('urlInput').value = '';
           document.getElementById('authorInput').value = '';
           document.getElementById('digestInput').value = '';
@@ -488,13 +497,13 @@
           <td class="title-cell" title="${esc(r.url)}">${esc(r.title || '-')}</td>
           <td>${esc(r.account_name)}</td>
           <td>${r.status === 'success'
-            ? '<span class="tag tag-ok">成功</span>'
+            ? '<span class="tag tag-ok">\u2705 成功</span>'
             : r.status === 'deleted'
-              ? '<span class="tag tag-del">已删除</span>'
-              : `<span class="tag tag-err" title="${esc(r.error_msg)}">失败</span>`
+              ? '<span class="tag tag-del">\u{1F5D1} 已删除</span>'
+              : `<span class="tag tag-err" title="${esc(r.error_msg)}">\u274C 失败</span>`
           }</td>
           <td>${r.status === 'success' && r.media_id
-            ? `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">删除草稿</button>`
+            ? `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">\u{1F5D1} 删除草稿</button>`
             : ''
           }</td>
         </tr>`).join('')}</tbody></table>`;
@@ -507,53 +516,119 @@
       } else { pagination.innerHTML = ''; }
     }
 
-    // ── 烟花 ──
+    // ── 烟花（全屏持续，点击关闭）──
+    let fwAnimId = null;
+    let fwParticles = [];
+    let fwRunning = false;
+
     function launchFireworks() {
       const canvas = document.getElementById('fireworks');
       const ctx = canvas.getContext('2d');
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      canvas.classList.add('active');
+      fwParticles = [];
+      fwRunning = true;
 
-      const particles = [];
-      const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6bff','#ffb347','#407600'];
+      const colors = [
+        '#ff6b6b','#ff3e3e','#ffd93d','#ffb347','#6bcb77','#2ecc71',
+        '#4d96ff','#3b7dff','#ff6bff','#e84393','#00cec9','#fdcb6e',
+        '#407600','#a29bfe','#fd79a8','#fab1a0','#55efc4','#74b9ff'
+      ];
 
-      for (let burst = 0; burst < 5; burst++) {
-        const cx = Math.random() * canvas.width * 0.6 + canvas.width * 0.2;
-        const cy = Math.random() * canvas.height * 0.3 + canvas.height * 0.1;
-        const count = 40 + Math.random() * 30;
+      function addBurst() {
+        if (!fwRunning) return;
+        const cx = Math.random() * canvas.width * 0.8 + canvas.width * 0.1;
+        const cy = Math.random() * canvas.height * 0.5 + canvas.height * 0.05;
+        const count = 60 + Math.random() * 60;
+        const burstColor = colors[Math.floor(Math.random() * colors.length)];
+        // 每次爆炸用 2-3 种颜色
+        const palette = [burstColor];
+        for (let c = 0; c < 2; c++) palette.push(colors[Math.floor(Math.random() * colors.length)]);
+
         for (let i = 0; i < count; i++) {
-          const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
-          const speed = 2 + Math.random() * 4;
-          particles.push({
-            x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-            life: 1, decay: 0.01 + Math.random() * 0.015,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            size: 2 + Math.random() * 2, delay: burst * 8,
+          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+          const speed = 3 + Math.random() * 7;
+          fwParticles.push({
+            x: cx, y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            life: 1,
+            decay: 0.006 + Math.random() * 0.012,
+            color: palette[Math.floor(Math.random() * palette.length)],
+            size: 2.5 + Math.random() * 3.5,
+            trail: [],
           });
         }
       }
 
-      let frame = 0;
+      // 初始多次爆炸
+      for (let i = 0; i < 4; i++) setTimeout(() => addBurst(), i * 200);
+      // 持续每 600-1200ms 一次新爆炸
+      const burstInterval = setInterval(() => {
+        if (!fwRunning) { clearInterval(burstInterval); return; }
+        addBurst();
+        if (Math.random() > 0.5) setTimeout(addBurst, 150); // 偶尔双连发
+      }, 600 + Math.random() * 600);
+
       function animate() {
-        frame++;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        let alive = false;
-        for (const p of particles) {
-          if (p.delay > 0) { p.delay--; alive = true; continue; }
-          if (p.life <= 0) continue;
-          alive = true;
-          p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.vx *= 0.99; p.life -= p.decay;
-          ctx.globalAlpha = Math.max(0, p.life);
+        if (!fwRunning) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          canvas.classList.remove('active');
+          return;
+        }
+        // 半透明黑底产生拖尾效果
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = fwParticles.length - 1; i >= 0; i--) {
+          const p = fwParticles[i];
+          p.life -= p.decay;
+          if (p.life <= 0) { fwParticles.splice(i, 1); continue; }
+
+          p.vy += 0.04; // 重力
+          p.vx *= 0.985;
+          p.x += p.vx;
+          p.y += p.vy;
+
+          // 发光效果
+          const glow = p.size * p.life * 2;
+          ctx.globalAlpha = p.life * 0.3;
           ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, glow, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 核心粒子
+          ctx.globalAlpha = Math.min(1, p.life * 1.5);
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
           ctx.fill();
+
+          // 闪烁的小火花
+          if (Math.random() > 0.92 && p.life > 0.3) {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(p.x + (Math.random() - 0.5) * 4, p.y + (Math.random() - 0.5) * 4, 1, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
+
         ctx.globalAlpha = 1;
-        if (alive) requestAnimationFrame(animate);
-        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+        fwAnimId = requestAnimationFrame(animate);
       }
       animate();
+    }
+
+    function stopFireworks() {
+      fwRunning = false;
+      if (fwAnimId) cancelAnimationFrame(fwAnimId);
+      const canvas = document.getElementById('fireworks');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.classList.remove('active');
+      fwParticles = [];
     }
 
     function setStatus(type, msg) {
