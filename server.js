@@ -143,30 +143,45 @@ app.post('/api/publish', auth, async (req, res) => {
   if (!url) return res.status(400).json({ error: '缺少链接' });
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
 
+  // SSE 实时进度
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  function sendProgress(step, percent, msg) {
+    res.write(`data: ${JSON.stringify({ type: 'progress', step, percent, msg })}\n\n`);
+  }
+
   let title = '';
   try {
-    console.log(`[Publish] ${operator} 开始爬取: ${url}`);
+    sendProgress(1, 10, '正在打开页面...');
     const parsed = await crawler.crawl(url);
     title = parsed.title || '未命名文章';
+    sendProgress(2, 35, `已解析「${title}」${parsed.blocks?.length || 0} 个内容块`);
 
-    console.log(`[Publish] 格式化: ${title}`);
+    sendProgress(3, 45, '正在排版格式化...');
     const html = formatToWechat(parsed);
+    sendProgress(3, 55, '排版完成，开始上传...');
 
-    console.log(`[Publish] 发布到: ${accountName}`);
     const client = getWechatClient(accountName);
+    sendProgress(4, 60, '正在上传图片到微信...');
+
     const result = await client.publishArticle({
       title,
       author: author || '',
       html,
       digest: digest || '',
     });
+    sendProgress(5, 100, '发布成功！');
 
     db.addLog({ operator, url, title, accountName, mediaId: result.media_id, status: 'success', errorMsg: '' });
-    res.json({ ok: true, title, media_id: result.media_id });
+    res.write(`data: ${JSON.stringify({ type: 'done', ok: true, title, media_id: result.media_id })}\n\n`);
+    res.end();
   } catch (e) {
     console.error('[Publish] 失败:', e.message);
     db.addLog({ operator, url, title, accountName, mediaId: '', status: 'error', errorMsg: e.message });
-    res.status(500).json({ error: e.message, title });
+    res.write(`data: ${JSON.stringify({ type: 'done', ok: false, error: e.message, title })}\n\n`);
+    res.end();
   }
 });
 

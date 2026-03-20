@@ -107,12 +107,28 @@
     .url-input:focus { border-color: var(--green) !important; box-shadow: 0 0 0 3px rgba(64,118,0,.1); }
 
     .btn-publish {
-      width: 100%; padding: 14px; background: var(--green); color: #fff; border: none;
+      width: 100%; padding: 14px; color: #fff; border: none; position: relative; overflow: hidden;
       border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
       margin-top: 4px; transition: all .2s; letter-spacing: .5px;
+      background: var(--green); z-index: 1;
     }
     .btn-publish:hover { background: var(--green-dark); }
-    .btn-publish:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-publish:disabled { cursor: not-allowed; }
+    .btn-publish .progress-fill {
+      position: absolute; top: 0; left: 0; height: 100%; width: 0;
+      background: var(--green-dark); transition: width .4s ease; z-index: -1;
+    }
+    .btn-publish.publishing { background: #888; }
+    .btn-publish.publishing .progress-fill { background: var(--green); }
+
+    .publish-log {
+      margin-top: 10px; font-size: 12px; color: var(--gray); min-height: 20px;
+      font-family: 'SF Mono', Monaco, Consolas, monospace; line-height: 1.6;
+      max-height: 80px; overflow-y: auto;
+    }
+    .publish-log .log-line { display: flex; gap: 6px; align-items: baseline; }
+    .publish-log .log-time { color: #bbb; flex-shrink: 0; }
+    .publish-log .log-msg { color: var(--dark); }
 
     .status-bar {
       margin-top: 14px; padding: 12px 16px; border-radius: var(--radius); font-size: 13px;
@@ -238,7 +254,11 @@
               <label>摘要（可选）</label>
               <input type="text" id="digestInput" placeholder="默认自动截取正文前 54 字">
             </div>
-            <button class="btn-publish" id="publishBtn" onclick="doPublish()">发布到草稿箱</button>
+            <button class="btn-publish" id="publishBtn" onclick="doPublish()">
+              <span class="progress-fill" id="progressFill"></span>
+              <span id="publishBtnText">发布到草稿箱</span>
+            </button>
+            <div class="publish-log" id="publishLog"></div>
             <div class="status-bar" id="status"></div>
           </div>
         </div>
@@ -441,27 +461,101 @@
       if (!url) return alert('请输入链接');
       if (!accountName) return alert('请选择公众号');
 
-      setStatus('loading', '\u23F3 正在爬取文档并发布，请稍候...');
-      document.getElementById('publishBtn').disabled = true;
+      const btn = document.getElementById('publishBtn');
+      const btnText = document.getElementById('publishBtnText');
+      const fill = document.getElementById('progressFill');
+      const logEl = document.getElementById('publishLog');
+
+      btn.disabled = true;
+      btn.classList.add('publishing');
+      fill.style.width = '5%';
+      btnText.textContent = '准备中...';
+      logEl.innerHTML = '';
+      setStatus('', '');
+
+      function addLog(msg) {
+        const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        logEl.innerHTML += `<div class="log-line"><span class="log-time">${now}</span><span class="log-msg">${esc(msg)}</span></div>`;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      addLog('开始发布任务...');
 
       try {
-        const data = await api('/api/publish', {
+        const res = await fetch('/api/publish', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
           body: JSON.stringify({ url, accountName, author, digest }),
         });
-        if (data.ok) {
-          setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
-          document.getElementById('urlInput').value = '';
-          document.getElementById('authorInput').value = '';
-          document.getElementById('digestInput').value = '';
-          launchFireworks();
+
+        // 检查是否是 SSE 流
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('text/event-stream')) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // 保留未完成的行
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'progress') {
+                  fill.style.width = data.percent + '%';
+                  btnText.textContent = data.msg;
+                  addLog(data.msg);
+                } else if (data.type === 'done') {
+                  if (data.ok) {
+                    fill.style.width = '100%';
+                    btnText.textContent = '发布成功!';
+                    addLog(`\u2705 草稿创建成功: ${data.title}`);
+                    setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
+                    document.getElementById('urlInput').value = '';
+                    document.getElementById('authorInput').value = '';
+                    document.getElementById('digestInput').value = '';
+                    launchFireworks();
+                  } else {
+                    addLog(`\u274C 失败: ${data.error}`);
+                    setStatus('error', `失败: ${esc(data.error)}`);
+                  }
+                }
+              } catch (_) {}
+            }
+          }
         } else {
-          setStatus('error', `失败: ${esc(data.error)}`);
+          // fallback: 普通 JSON 响应
+          const data = await res.json();
+          if (data.ok) {
+            fill.style.width = '100%';
+            setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
+            document.getElementById('urlInput').value = '';
+            document.getElementById('authorInput').value = '';
+            document.getElementById('digestInput').value = '';
+            launchFireworks();
+          } else {
+            setStatus('error', `失败: ${esc(data.error)}`);
+          }
         }
       } catch (e) {
+        addLog(`\u274C 请求异常: ${e.message}`);
         setStatus('error', `请求异常: ${e.message}`);
       } finally {
-        document.getElementById('publishBtn').disabled = false;
+        btn.disabled = false;
+        btn.classList.remove('publishing');
+        setTimeout(() => {
+          fill.style.width = '0';
+          btnText.textContent = '发布到草稿箱';
+        }, 2000);
         loadLogs();
       }
     }
