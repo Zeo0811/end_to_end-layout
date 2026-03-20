@@ -13,10 +13,20 @@ function parseNotion() {
     document.querySelector('[data-content-editable-root]') ||
     document.querySelector('[class*="layout-content"]') ||
     document.querySelector('main [class*="content"]') ||
-    document.querySelector('main');
+    // Notion 公开页面 fallback
+    document.querySelector('[class*="super-content"]') ||
+    document.querySelector('[class*="page-body"]') ||
+    document.querySelector('[data-block-id]')?.parentElement ||
+    document.querySelector('main') ||
+    document.querySelector('article');
 
   if (!contentArea) {
-    throw new Error('无法找到Notion页面内容，请确保页面已完全加载，并在文章页面使用本插件');
+    // 调试信息：列出页面上的主要元素
+    const bodyClasses = document.body.className || '';
+    const mainEl = document.querySelector('main');
+    const divCount = document.querySelectorAll('div[class]').length;
+    const blockCount = document.querySelectorAll('[data-block-id]').length;
+    throw new Error(`无法找到Notion页面内容。body.class="${bodyClasses}", main=${!!mainEl}, divs=${divCount}, blocks=${blockCount}, url=${location.href}`);
   }
 
   const blocks = parseNotionBlocks(Array.from(contentArea.children), links, 0);

@@ -152,18 +152,30 @@ async function crawl(url) {
 
   try {
     console.log(`[Crawler] 打开 ${platform} 页面: ${url}`);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {
+      console.log('[Crawler] networkidle 超时，继续尝试...');
+    });
 
     if (platform === 'notion') {
-      await page.waitForSelector(
-        '.notion-page-content, [data-content-editable-root], [class*="layout-content"]',
-        { timeout: 15000 }
-      ).catch(() => {});
-      await page.waitForTimeout(3000);
+      // 多种选择器，兼容不同版本 Notion 公开页面
+      const notionSelectors = [
+        '.notion-page-content',
+        '[data-content-editable-root]',
+        '[class*="layout-content"]',
+        '.notion-presence-container',
+        '[class*="notion-page"]',
+        'main [class*="page-content"]',
+        '[data-block-id]',
+      ];
+      await page.waitForSelector(notionSelectors.join(', '), { timeout: 30000 }).catch(() => {
+        console.log('[Crawler] Notion 选择器未匹配，等待额外时间...');
+      });
+      // 等待页面内容充分渲染
+      await page.waitForTimeout(5000);
 
       // 滚动页面确保所有内容（包括视频）都加载
       await autoScroll(page);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
     } else {
       await page.waitForSelector(
         '[data-block-type="page"], .lark-ck-editor, [class*="docx-content"]',
