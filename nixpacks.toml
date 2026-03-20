@@ -2,7 +2,7 @@
 nixPkgs = ["...", "chromium"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm install --build-from-source"]
 
 [start]
 cmd = "node server.js"
