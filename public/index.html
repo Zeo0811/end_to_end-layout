@@ -784,13 +784,21 @@
       document.getElementById('modalOverlay').classList.add('show');
       return new Promise(resolve => {
         modalResolve = resolve;
-        confirmBtn.onclick = () => { closeModal(); resolve(true); };
+        confirmBtn.onclick = () => {
+          document.getElementById('modalOverlay').classList.remove('show');
+          modalResolve = null;
+          resolve(true);
+        };
       });
     }
 
     function closeModal() {
       document.getElementById('modalOverlay').classList.remove('show');
-      if (modalResolve) { modalResolve(false); modalResolve = null; }
+      if (modalResolve) {
+        const r = modalResolve;
+        modalResolve = null;
+        r(false);
+      }
     }
 
     function setStatus(type, msg) {
