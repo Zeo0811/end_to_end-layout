@@ -82,7 +82,7 @@ function createClient(appId, appSecret) {
       const { body, contentType } = buildMultipart([
         { name: 'media', filename: filename || 'image.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
       ]);
-      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body, signal: AbortSignal.timeout(60000) });
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
       const data = await res.json();
       if (data.errcode) throw new Error(`上传文章图片失败: [${data.errcode}] ${data.errmsg}`);
       return data.url;
@@ -96,7 +96,7 @@ function createClient(appId, appSecret) {
       const { body, contentType } = buildMultipart([
         { name: 'media', filename: filename || 'thumb.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
       ]);
-      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body, signal: AbortSignal.timeout(60000) });
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
       const data = await res.json();
       if (data.errcode) throw new Error(`上传永久素材失败: [${data.errcode}] ${data.errmsg}`);
       return { media_id: data.media_id, url: data.url };
