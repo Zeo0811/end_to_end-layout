@@ -159,6 +159,8 @@ app.post('/api/publish', auth, async (req, res) => {
   const operator = req.user.username;
 
   if (!url) return res.status(400).json({ error: '缺少链接' });
+  // 兼容 Notion 分享的路径片段（如 /3258e8f5...?source=copy_link）
+  if (/^\/[0-9a-f]{32}/.test(url.trim())) url = 'https://www.notion.so' + url.trim();
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
 
   // SSE 实时进度

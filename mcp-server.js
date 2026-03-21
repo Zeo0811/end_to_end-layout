@@ -138,25 +138,33 @@ let buffer = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => {
   buffer += chunk;
+  // 支持两种格式：Content-Length framing 和 NDJSON（换行分隔）
   while (true) {
-    const headerEnd = buffer.indexOf('\r\n\r\n');
-    if (headerEnd === -1) break;
-    const header = buffer.slice(0, headerEnd);
-    const match = header.match(/Content-Length:\s*(\d+)/i);
-    if (!match) { buffer = buffer.slice(headerEnd + 4); continue; }
-    const len = parseInt(match[1]);
-    const bodyStart = headerEnd + 4;
-    if (buffer.length < bodyStart + len) break;
-    const body = buffer.slice(bodyStart, bodyStart + len);
-    buffer = buffer.slice(bodyStart + len);
-    handleMessage(JSON.parse(body));
+    if (buffer.includes('\r\n\r\n')) {
+      // Content-Length framing（旧格式）
+      const headerEnd = buffer.indexOf('\r\n\r\n');
+      const header = buffer.slice(0, headerEnd);
+      const match = header.match(/Content-Length:\s*(\d+)/i);
+      if (!match) { buffer = buffer.slice(headerEnd + 4); continue; }
+      const len = parseInt(match[1]);
+      const bodyStart = headerEnd + 4;
+      if (buffer.length < bodyStart + len) break;
+      const body = buffer.slice(bodyStart, bodyStart + len);
+      buffer = buffer.slice(bodyStart + len);
+      handleMessage(JSON.parse(body));
+    } else {
+      // NDJSON（新格式，换行分隔）
+      const nl = buffer.indexOf('\n');
+      if (nl === -1) break;
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line) handleMessage(JSON.parse(line));
+    }
   }
 });
 
 function send(msg) {
-  const json = JSON.stringify(msg);
-  const out = `Content-Length: ${Buffer.byteLength(json)}\r\n\r\n${json}`;
-  process.stdout.write(out);
+  process.stdout.write(JSON.stringify(msg) + '\n');
 }
 
 async function handleMessage(msg) {

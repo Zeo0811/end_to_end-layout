@@ -51,6 +51,19 @@ async function ensureBrowser() {
   return browser;
 }
 
+function normalizeUrl(url) {
+  url = url.trim();
+  // 纯路径片段如 /3258e8f5...?source=copy_link，补全为 notion.so
+  if (/^\/[0-9a-f]{32}/.test(url)) {
+    return 'https://www.notion.so' + url;
+  }
+  // 没有协议头则补上
+  if (!/^https?:\/\//i.test(url)) {
+    url = 'https://' + url;
+  }
+  return url;
+}
+
 function detectPlatform(url) {
   if (/notion\.(so|site)/.test(url)) return 'notion';
   if (/feishu\.cn|larksuite\.com/.test(url)) return 'feishu';
@@ -143,6 +156,7 @@ async function extractVideoUrls(page) {
 }
 
 async function crawl(url) {
+  url = normalizeUrl(url);
   const platform = detectPlatform(url);
   if (!platform) {
     throw new Error('不支持的链接，仅支持 Notion 和飞书公开链接');
