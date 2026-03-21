@@ -136,18 +136,39 @@ function createClient(appId, appSecret) {
 
   // 微信上传图片大小限制：文章图片接口 10MB
   const IMAGE_SIZE_LIMIT = 10 * 1024 * 1024;
+  // GIF 大小限制：超过此值则压缩
+  const GIF_SIZE_LIMIT = 5 * 1024 * 1024;
 
   function mimeToExt(mime) {
     const map = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp', 'image/svg+xml': '.svg' };
     return map[mime] || '.jpg';
   }
 
-  // 将 GIF 的第一帧提取为静态 JPEG（用于 GIF 超过大小限制时的降级方案）
-  function gifToStaticJpeg(gifBuffer) {
-    // 提取 GIF 第一帧的简易方式：截取到第一个图像数据块结束
-    // 构造一个单帧 GIF，然后标记为 image/gif（微信仍可接受较小的单帧 GIF）
-    // 但更实用的做法：使用 PNG 头标记通知上层跳过动画
-    // 由于没有 sharp 依赖，这里返回 null 表示无法压缩
+  // 压缩 GIF 到目标大小（通过逐步缩小尺寸）
+  async function compressGif(gifBuffer, targetSize) {
+    const sharp = require('sharp');
+    const metadata = await sharp(gifBuffer, { animated: true }).metadata();
+    const origWidth = metadata.width || 800;
+    const origHeight = metadata.pageHeight || metadata.height || 600;
+
+    // 逐步缩小到 90%、80%、...、30%，直到小于目标大小
+    for (let scale = 0.9; scale >= 0.3; scale -= 0.1) {
+      const w = Math.round(origWidth * scale);
+      const h = Math.round(origHeight * scale);
+      try {
+        const compressed = await sharp(gifBuffer, { animated: true })
+          .resize(w, h)
+          .gif()
+          .toBuffer();
+        console.log(`[WeChat] GIF 压缩 ${Math.round(scale * 100)}% → ${(compressed.length / 1024 / 1024).toFixed(2)}MB`);
+        if (compressed.length <= targetSize) {
+          return { buffer: compressed, mime: 'image/gif' };
+        }
+      } catch (e) {
+        console.warn(`[WeChat] GIF 压缩失败 (scale=${scale}):`, e.message);
+        break;
+      }
+    }
     return null;
   }
 
@@ -199,26 +220,26 @@ function createClient(appId, appSecret) {
         const sizeMB = (uploadBuffer.length / 1024 / 1024).toFixed(2);
         const isGif = uploadMime === 'image/gif';
 
-        // 检查文件大小是否超过微信限制
-        if (uploadBuffer.length > IMAGE_SIZE_LIMIT) {
-          console.warn(`[WeChat] 图片 #${idx} 超过 10MB 限制 (${sizeMB}MB), 类型: ${uploadMime}`);
-          if (isGif) {
-            console.warn(`[WeChat] GIF 图片过大，尝试降级为静态图...`);
-            const fallback = gifToStaticJpeg(uploadBuffer);
-            if (fallback) {
-              uploadBuffer = fallback.buffer;
-              uploadMime = fallback.mime;
-              console.log(`[WeChat] GIF 降级后大小: ${(uploadBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-            } else {
-              console.error(`[WeChat] GIF 图片 #${idx} (${sizeMB}MB) 超过微信 10MB 限制且无法压缩，跳过上传`);
-              return null;
-            }
+        // GIF 超过 5MB 则压缩
+        if (isGif && uploadBuffer.length > GIF_SIZE_LIMIT) {
+          console.warn(`[WeChat] GIF 图片 #${idx} 超过 5MB (${sizeMB}MB)，开始压缩...`);
+          const compressed = await compressGif(uploadBuffer, GIF_SIZE_LIMIT);
+          if (compressed) {
+            uploadBuffer = compressed.buffer;
+            uploadMime = compressed.mime;
+            console.log(`[WeChat] GIF 压缩完成: ${(uploadBuffer.length / 1024 / 1024).toFixed(2)}MB`);
           } else {
-            console.error(`[WeChat] 图片 #${idx} (${sizeMB}MB) 超过微信 10MB 限制，跳过上传`);
+            console.error(`[WeChat] GIF 图片 #${idx} (${sizeMB}MB) 压缩失败，跳过上传`);
             return null;
           }
         } else if (isGif) {
           console.log(`[WeChat] GIF 图片 #${idx}: ${sizeMB}MB`);
+        }
+
+        // 非 GIF 图片超过 10MB 限制则跳过
+        if (!isGif && uploadBuffer.length > IMAGE_SIZE_LIMIT) {
+          console.error(`[WeChat] 图片 #${idx} (${sizeMB}MB) 超过微信 10MB 限制，跳过上传`);
+          return null;
         }
 
         const filename = `img_${idx}${mimeToExt(uploadMime)}`;
