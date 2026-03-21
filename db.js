@@ -15,7 +15,7 @@ db.exec(`
     username   TEXT UNIQUE NOT NULL,
     password   TEXT NOT NULL,
     role       TEXT NOT NULL DEFAULT 'user',
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', '+8 hours'))
   );
 
   CREATE TABLE IF NOT EXISTS accounts (
@@ -23,7 +23,7 @@ db.exec(`
     name       TEXT UNIQUE NOT NULL,
     app_id     TEXT NOT NULL,
     app_secret TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', '+8 hours'))
   );
 
   CREATE TABLE IF NOT EXISTS logs (
@@ -35,7 +35,7 @@ db.exec(`
     media_id     TEXT,
     status       TEXT,
     error_msg    TEXT,
-    created_at   TEXT DEFAULT (datetime('now'))
+    created_at   TEXT DEFAULT (datetime('now', '+8 hours'))
   );
 `);
 
