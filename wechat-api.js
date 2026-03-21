@@ -82,7 +82,7 @@ function createClient(appId, appSecret) {
       const { body, contentType } = buildMultipart([
         { name: 'media', filename: filename || 'image.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
       ]);
-      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body, signal: AbortSignal.timeout(60000) });
       const data = await res.json();
       if (data.errcode) throw new Error(`上传文章图片失败: [${data.errcode}] ${data.errmsg}`);
       return data.url;
@@ -96,7 +96,7 @@ function createClient(appId, appSecret) {
       const { body, contentType } = buildMultipart([
         { name: 'media', filename: filename || 'thumb.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
       ]);
-      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body, signal: AbortSignal.timeout(60000) });
       const data = await res.json();
       if (data.errcode) throw new Error(`上传永久素材失败: [${data.errcode}] ${data.errmsg}`);
       return { media_id: data.media_id, url: data.url };
@@ -174,11 +174,11 @@ function createClient(appId, appSecret) {
         }
       }
 
-      // 有损压缩不够，逐步缩小尺寸
-      for (let scale = 0.8; scale >= 0.3; scale -= 0.1) {
+      // 有损压缩不够，逐步缩小尺寸 + 更高 lossy
+      for (let scale = 0.8; scale >= 0.1; scale -= 0.1) {
         const scaleStr = scale.toFixed(2);
         try {
-          execFileSync('gifsicle', ['-O3', '--lossy=80', `--scale=${scaleStr}`, '-o', outputPath, inputPath], { timeout: 30000 });
+          execFileSync('gifsicle', ['-O3', '--lossy=200', `--scale=${scaleStr}`, '-o', outputPath, inputPath], { timeout: 30000 });
           const result = fs.readFileSync(outputPath);
           console.log(`[WeChat] GIF 缩放 ${Math.round(scale * 100)}% → ${(result.length / 1024 / 1024).toFixed(2)}MB`);
           if (result.length <= targetSize) {
@@ -188,6 +188,18 @@ function createClient(appId, appSecret) {
           console.warn(`[WeChat] gifsicle 缩放失败 (scale=${scaleStr}):`, e.message);
           break;
         }
+      }
+
+      // 兜底：提取第一帧转为静态图片
+      try {
+        execFileSync('gifsicle', ['#0', '-o', outputPath, inputPath], { timeout: 10000 });
+        const firstFrame = fs.readFileSync(outputPath);
+        console.warn(`[WeChat] GIF 压缩仍超限，提取第一帧 (${(firstFrame.length / 1024 / 1024).toFixed(2)}MB)`);
+        if (firstFrame.length <= targetSize) {
+          return { buffer: firstFrame, mime: 'image/gif' };
+        }
+      } catch (e) {
+        console.warn('[WeChat] 提取 GIF 第一帧失败:', e.message);
       }
 
       return null;
