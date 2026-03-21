@@ -72,20 +72,15 @@ function detectPlatform(url) {
 
 // 在页面上下文中将所有图片转为 base64 data URL
 // 包括 blob:、Notion 签名 URL 等服务端无法直接 fetch 的图片
-// 注意：GIF 图片使用 fetch 保留原始格式，避免 canvas 转为静态 PNG
 async function convertAllImages(page) {
   return page.evaluate(async () => {
     const imgs = document.querySelectorAll('img');
     for (const img of imgs) {
       const src = img.currentSrc || img.src || '';
       if (!src || src.startsWith('data:')) continue;
-
-      // 判断是否为 GIF（通过 URL 扩展名或已知的 content-type）
-      const isGif = /\.gif(\?|$)/i.test(src);
-
       try {
-        // GIF 图片必须用 fetch 保留原始格式，canvas 会丢失动画
-        if (!isGif && img.complete && img.naturalWidth > 0) {
+        // 用 canvas 方式转换（利用浏览器已加载的图片缓存）
+        if (img.complete && img.naturalWidth > 0) {
           const canvas = document.createElement('canvas');
           canvas.width = img.naturalWidth;
           canvas.height = img.naturalHeight;
@@ -101,11 +96,10 @@ async function convertAllImages(page) {
             // canvas tainted by CORS, fallback to fetch
           }
         }
-        // fetch 方式（blob: URL、GIF 或需要 cookie 的 URL）
+        // fetch 方式（blob: URL 或需要 cookie 的 URL）
         const resp = await fetch(src, { credentials: 'include' });
         if (!resp.ok) continue;
         const blob = await resp.blob();
-        // 对于 GIF，确保使用实际的 content-type 而非 canvas 转换
         const reader = new FileReader();
         const dataUrl = await new Promise((resolve, reject) => {
           reader.onload = () => resolve(reader.result);
