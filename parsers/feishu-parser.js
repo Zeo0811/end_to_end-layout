@@ -372,11 +372,31 @@ function parseFeishuBlock(el, blockType, links) {
     case 'video': {
       const videoEl  = el.querySelector('video');
       const iframeEl = el.querySelector('iframe');
-      return {
-        type: 'video',
-        url: videoEl?.getAttribute('src') || iframeEl?.getAttribute('src') || '',
-        thumbnailUrl: videoEl?.getAttribute('poster') || el.querySelector('img')?.getAttribute('src') || '',
-      };
+      // 优先用 .src（浏览器自动解码 HTML 实体 &amp; → &）
+      const url = videoEl?.src || videoEl?.getAttribute('src') || iframeEl?.src || iframeEl?.getAttribute('src') || '';
+      // 封面：xgplayer 把封面放在 xg-poster 的 style 里
+      let thumbnailUrl = videoEl?.poster || videoEl?.getAttribute('poster') || '';
+      if (!thumbnailUrl) {
+        const posterEl = el.querySelector('[class*="xgplayer-poster"], [data-sel="box-preview-video-content"] img');
+        if (posterEl) {
+          thumbnailUrl = posterEl.src || posterEl.getAttribute('src') || '';
+          // 从 background-image style 提取
+          if (!thumbnailUrl) {
+            const bg = posterEl.style?.backgroundImage || '';
+            const m = bg.match(/url\(["']?([^"')]+)["']?\)/);
+            if (m) thumbnailUrl = m[1];
+          }
+        }
+      }
+      if (!thumbnailUrl) {
+        const xgPoster = el.querySelector('.xgplayer-poster');
+        if (xgPoster) {
+          const bg = xgPoster.style?.backgroundImage || '';
+          const m = bg.match(/url\(["']?([^"')]+)["']?\)/);
+          if (m) thumbnailUrl = m[1];
+        }
+      }
+      return { type: 'video', url, thumbnailUrl };
     }
 
     case 'table':

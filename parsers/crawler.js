@@ -53,8 +53,8 @@ async function ensureBrowser() {
 
 function normalizeUrl(url) {
   url = url.trim();
-  // 纯路径片段如 /3258e8f5...?source=copy_link，补全为 notion.so
-  if (/^\/[0-9a-f]{32}/.test(url)) {
+  // Notion 路径片段：纯 ID 或 带标题前缀的 slug（末尾为 32 位 hex ID）
+  if (/^\/.*[0-9a-f]{32}(\?|$)/.test(url)) {
     return 'https://www.notion.so' + url;
   }
   // 没有协议头则补上
@@ -119,13 +119,16 @@ async function extractVideoUrls(page) {
 
     // 1. 直接的 <video> 元素
     document.querySelectorAll('video').forEach(v => {
+      // 优先用 .src（浏览器解析后的完整 URL），再用属性
       const src = v.src || v.getAttribute('src') || '';
       const poster = v.poster || v.getAttribute('poster') || '';
-      // 也检查 <source> 子元素
       const sourceEl = v.querySelector('source');
       const sourceSrc = sourceEl ? (sourceEl.src || sourceEl.getAttribute('src') || '') : '';
       const url = src || sourceSrc;
-      if (url) videos.push({ url, poster });
+      // 过滤掉缩略图 URL（poster 误跑进 src 的情况）
+      if (url && !url.includes('_thumbnail') && !url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
+        videos.push({ url, poster });
+      }
     });
 
     // 2. Notion 的 video block 可能用 iframe 嵌入
@@ -169,13 +172,13 @@ async function crawl(url) {
   });
   const page = await context.newPage();
 
-  // 拦截并记录所有视频相关的请求 URL
+  // 拦截并记录所有视频相关的请求 URL（排除缩略图）
   const videoRequestUrls = [];
   page.on('response', response => {
     const resUrl = response.url();
     const contentType = response.headers()['content-type'] || '';
-    if (contentType.includes('video') || resUrl.match(/\.(mp4|mov|webm|avi)/i) ||
-        (resUrl.includes('file.notion.so') && resUrl.includes('mov'))) {
+    const isThumb = resUrl.includes('_thumbnail') || resUrl.includes('.jpg') || resUrl.includes('.jpeg') || resUrl.includes('.png') || resUrl.includes('.webp');
+    if (!isThumb && (contentType.includes('video') || resUrl.match(/\.(mp4|mov|webm|avi)/i))) {
       videoRequestUrls.push(resUrl);
     }
   });
@@ -205,12 +208,17 @@ async function crawl(url) {
 
       // 滚动页面确保所有内容（包括视频）都加载
       await autoScroll(page);
-      await page.waitForTimeout(2000);
+      // 等待视频元素出现（Notion 视频懒加载）
+      await page.waitForSelector('video, [data-block-type="video"]', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(3000);
     } else {
       await page.waitForSelector(
         '[data-block-type="page"], .lark-ck-editor, [class*="docx-content"]',
         { timeout: 15000 }
       ).catch(() => {});
+      await page.waitForTimeout(2000);
+      // 等待视频元素加载
+      await page.waitForSelector('video, [class*="is-in-video"]', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
     }
 
@@ -220,6 +228,7 @@ async function crawl(url) {
     // 提取视频 URL（在解析之前，趁页面还活着）
     const pageVideos = await extractVideoUrls(page);
     console.log(`[Crawler] 页面中发现 ${pageVideos.length} 个视频, 网络请求中发现 ${videoRequestUrls.length} 个视频 URL`);
+
 
     let result;
 
@@ -242,6 +251,17 @@ async function crawl(url) {
 
       // 飞书滚动后新加载的图片需要再次转换
       await convertAllImages(page);
+
+      // 飞书视频需要 cookie 才能下载，提取当前 session cookies
+      const feishuCookies = await context.cookies();
+      const cookieStr = feishuCookies.map(c => `${c.name}=${c.value}`).join('; ');
+      if (result && result.blocks) {
+        for (const block of result.blocks) {
+          if (block.type === 'video' && block.url && block.url.includes('feishu.cn')) {
+            block._cookies = cookieStr;
+          }
+        }
+      }
     }
 
     // 将 blocks 中的 blob: 图片在页面上下文中转为 base64

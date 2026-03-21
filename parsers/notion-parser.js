@@ -377,8 +377,9 @@ function parseNotionVideo(el) {
   let url = '', thumbnailUrl = '';
 
   if (videoEl) {
-    url = videoEl.getAttribute('src') || '';
-    thumbnailUrl = videoEl.getAttribute('poster') || '';
+    // 优先用 .src（浏览器解析后的完整绝对 URL）
+    url = videoEl.src || videoEl.getAttribute('src') || '';
+    thumbnailUrl = videoEl.poster || videoEl.getAttribute('poster') || '';
   } else if (iframeEl) {
     url = iframeEl.getAttribute('src') || '';
   }

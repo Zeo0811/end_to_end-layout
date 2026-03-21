@@ -261,10 +261,11 @@ function renderImage(block) {
 function renderVideo(block) {
   const videoUrl = escAttr(block.url || '');
   const thumbSrc = block.thumbnailUrl ? escAttr(block.thumbnailUrl) : '';
+  const cookiesAttr = block._cookies ? ` data-video-cookies="${escAttr(block._cookies)}"` : '';
   if (thumbSrc) {
-    return `<section data-video-src="${videoUrl}" data-video-thumb="${thumbSrc}" style="${S.img_wrapper}"><img src="${thumbSrc}" style="${S.img}" alt="视频封面" /><p style="${S.img_caption}">${escHtml('\uD83D\uDCF9')} 视频内容请前往原文查看</p></section>`;
+    return `<section data-video-src="${videoUrl}" data-video-thumb="${thumbSrc}"${cookiesAttr} style="${S.img_wrapper}"><img src="${thumbSrc}" style="${S.img}" alt="视频封面" /><p style="${S.img_caption}">${escHtml('\uD83D\uDCF9')} 视频内容请前往原文查看</p></section>`;
   }
-  return `<section data-video-src="${videoUrl}" style="${S.video_wrapper}"><p style="${S.video_label}">${escHtml('\uD83D\uDCF9')} 视频内容请前往原文查看</p></section>`;
+  return `<section data-video-src="${videoUrl}"${cookiesAttr} style="${S.video_wrapper}"><p style="${S.video_label}">${escHtml('\uD83D\uDCF9')} 视频内容请前往原文查看</p></section>`;
 }
 
 function renderToggle(block, links, depth) {

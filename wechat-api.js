@@ -224,10 +224,12 @@ function createClient(appId, appSecret) {
       const videoUrl = match[1];
       if (!videoUrl) continue;
       const thumbMatch = match[0].match(/data-video-thumb="([^"]*)"/);
+      const cookiesMatch = match[0].match(/data-video-cookies="([^"]*)"/);
       matches.push({
         fullMatch: match[0],
         videoUrl,
         thumbUrl: thumbMatch ? thumbMatch[1] : '',
+        cookies: cookiesMatch ? cookiesMatch[1] : '',
       });
     }
 
@@ -237,7 +239,9 @@ function createClient(appId, appSecret) {
     for (const m of matches) {
       try {
         console.log('[WeChat] 下载视频:', m.videoUrl.slice(0, 100));
-        const resp = await fetch(m.videoUrl, { redirect: 'follow', signal: AbortSignal.timeout(60000) });
+        const fetchHeaders = {};
+        if (m.cookies) fetchHeaders['Cookie'] = m.cookies;
+        const resp = await fetch(m.videoUrl, { redirect: 'follow', signal: AbortSignal.timeout(120000), headers: fetchHeaders });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const videoBuffer = Buffer.from(await resp.arrayBuffer());
         const sizeMB = (videoBuffer.length / 1024 / 1024).toFixed(1);
