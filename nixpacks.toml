@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["...", "chromium", "python3", "gcc", "gnumake"]
+nixPkgs = ["...", "chromium", "python3", "gcc", "gnumake", "gifsicle"]
 
 [phases.install]
 cmds = ["npm install --build-from-source"]
