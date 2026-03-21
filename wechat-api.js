@@ -144,32 +144,57 @@ function createClient(appId, appSecret) {
     return map[mime] || '.jpg';
   }
 
-  // 压缩 GIF 到目标大小（通过逐步缩小尺寸）
+  // 压缩 GIF 到目标大小（使用 gifsicle 命令行工具，无需原生编译）
   async function compressGif(gifBuffer, targetSize) {
-    const sharp = require('sharp');
-    const metadata = await sharp(gifBuffer, { animated: true }).metadata();
-    const origWidth = metadata.width || 800;
-    const origHeight = metadata.pageHeight || metadata.height || 600;
+    const { execFileSync } = require('child_process');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
 
-    // 逐步缩小到 90%、80%、...、30%，直到小于目标大小
-    for (let scale = 0.9; scale >= 0.3; scale -= 0.1) {
-      const w = Math.round(origWidth * scale);
-      const h = Math.round(origHeight * scale);
-      try {
-        const compressed = await sharp(gifBuffer, { animated: true })
-          .resize(w, h)
-          .gif()
-          .toBuffer();
-        console.log(`[WeChat] GIF 压缩 ${Math.round(scale * 100)}% → ${(compressed.length / 1024 / 1024).toFixed(2)}MB`);
-        if (compressed.length <= targetSize) {
-          return { buffer: compressed, mime: 'image/gif' };
+    const tmpDir = os.tmpdir();
+    const inputPath = path.join(tmpDir, `gif_in_${Date.now()}.gif`);
+    const outputPath = path.join(tmpDir, `gif_out_${Date.now()}.gif`);
+
+    try {
+      fs.writeFileSync(inputPath, gifBuffer);
+
+      // 先尝试 gifsicle 优化（不缩放），--lossy=80 有损压缩 + -O3 最大优化
+      const lossy = [30, 60, 80, 120, 160, 200];
+      for (const l of lossy) {
+        try {
+          execFileSync('gifsicle', ['-O3', `--lossy=${l}`, '-o', outputPath, inputPath], { timeout: 30000 });
+          const result = fs.readFileSync(outputPath);
+          console.log(`[WeChat] GIF gifsicle --lossy=${l} → ${(result.length / 1024 / 1024).toFixed(2)}MB`);
+          if (result.length <= targetSize) {
+            return { buffer: result, mime: 'image/gif' };
+          }
+        } catch (e) {
+          // gifsicle 可能不支持 --lossy，继续尝试缩放
+          break;
         }
-      } catch (e) {
-        console.warn(`[WeChat] GIF 压缩失败 (scale=${scale}):`, e.message);
-        break;
       }
+
+      // 有损压缩不够，逐步缩小尺寸
+      for (let scale = 0.8; scale >= 0.3; scale -= 0.1) {
+        const scaleStr = scale.toFixed(2);
+        try {
+          execFileSync('gifsicle', ['-O3', '--lossy=80', `--scale=${scaleStr}`, '-o', outputPath, inputPath], { timeout: 30000 });
+          const result = fs.readFileSync(outputPath);
+          console.log(`[WeChat] GIF 缩放 ${Math.round(scale * 100)}% → ${(result.length / 1024 / 1024).toFixed(2)}MB`);
+          if (result.length <= targetSize) {
+            return { buffer: result, mime: 'image/gif' };
+          }
+        } catch (e) {
+          console.warn(`[WeChat] gifsicle 缩放失败 (scale=${scaleStr}):`, e.message);
+          break;
+        }
+      }
+
+      return null;
+    } finally {
+      try { fs.unlinkSync(inputPath); } catch (_) {}
+      try { fs.unlinkSync(outputPath); } catch (_) {}
     }
-    return null;
   }
 
   async function processHtmlImages(html, onProgress) {
