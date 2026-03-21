@@ -134,79 +134,9 @@ function createClient(appId, appSecret) {
     return { buffer: Buffer.from(m[2], 'base64'), mimeType: m[1] };
   }
 
-  // 微信上传图片大小限制：文章图片接口 10MB
-  const IMAGE_SIZE_LIMIT = 10 * 1024 * 1024;
-  // GIF 大小限制：超过此值则压缩
-  const GIF_SIZE_LIMIT = 5 * 1024 * 1024;
-
   function mimeToExt(mime) {
     const map = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp', 'image/svg+xml': '.svg' };
     return map[mime] || '.jpg';
-  }
-
-  // 压缩 GIF 到目标大小（使用 gifsicle 命令行工具，无需原生编译）
-  async function compressGif(gifBuffer, targetSize) {
-    const { execFileSync } = require('child_process');
-    const fs = require('fs');
-    const os = require('os');
-    const path = require('path');
-
-    const tmpDir = os.tmpdir();
-    const inputPath = path.join(tmpDir, `gif_in_${Date.now()}.gif`);
-    const outputPath = path.join(tmpDir, `gif_out_${Date.now()}.gif`);
-
-    try {
-      fs.writeFileSync(inputPath, gifBuffer);
-
-      // 先尝试 gifsicle 优化（不缩放），--lossy=80 有损压缩 + -O3 最大优化
-      const lossy = [30, 60, 80, 120, 160, 200];
-      for (const l of lossy) {
-        try {
-          execFileSync('gifsicle', ['-O3', `--lossy=${l}`, '-o', outputPath, inputPath], { timeout: 30000 });
-          const result = fs.readFileSync(outputPath);
-          console.log(`[WeChat] GIF gifsicle --lossy=${l} → ${(result.length / 1024 / 1024).toFixed(2)}MB`);
-          if (result.length <= targetSize) {
-            return { buffer: result, mime: 'image/gif' };
-          }
-        } catch (e) {
-          // gifsicle 可能不支持 --lossy，继续尝试缩放
-          break;
-        }
-      }
-
-      // 有损压缩不够，逐步缩小尺寸 + 更高 lossy
-      for (let scale = 0.8; scale >= 0.1; scale -= 0.1) {
-        const scaleStr = scale.toFixed(2);
-        try {
-          execFileSync('gifsicle', ['-O3', '--lossy=200', `--scale=${scaleStr}`, '-o', outputPath, inputPath], { timeout: 30000 });
-          const result = fs.readFileSync(outputPath);
-          console.log(`[WeChat] GIF 缩放 ${Math.round(scale * 100)}% → ${(result.length / 1024 / 1024).toFixed(2)}MB`);
-          if (result.length <= targetSize) {
-            return { buffer: result, mime: 'image/gif' };
-          }
-        } catch (e) {
-          console.warn(`[WeChat] gifsicle 缩放失败 (scale=${scaleStr}):`, e.message);
-          break;
-        }
-      }
-
-      // 兜底：提取第一帧转为静态图片
-      try {
-        execFileSync('gifsicle', ['#0', '-o', outputPath, inputPath], { timeout: 10000 });
-        const firstFrame = fs.readFileSync(outputPath);
-        console.warn(`[WeChat] GIF 压缩仍超限，提取第一帧 (${(firstFrame.length / 1024 / 1024).toFixed(2)}MB)`);
-        if (firstFrame.length <= targetSize) {
-          return { buffer: firstFrame, mime: 'image/gif' };
-        }
-      } catch (e) {
-        console.warn('[WeChat] 提取 GIF 第一帧失败:', e.message);
-      }
-
-      return null;
-    } finally {
-      try { fs.unlinkSync(inputPath); } catch (_) {}
-      try { fs.unlinkSync(outputPath); } catch (_) {}
-    }
   }
 
   async function processHtmlImages(html, onProgress) {
@@ -225,7 +155,7 @@ function createClient(appId, appSecret) {
           const parsed = base64ToBuffer(img.src);
           return parsed ? { src: img.src, buffer: parsed.buffer, mime: parsed.mimeType } : null;
         } else if (img.src.startsWith('http')) {
-          const resp = await fetch(img.src, { signal: AbortSignal.timeout(30000) });
+          const resp = await fetch(img.src, { signal: AbortSignal.timeout(15000) });
           if (!resp.ok) return null;
           return {
             src: img.src,
@@ -251,36 +181,8 @@ function createClient(appId, appSecret) {
           firstImageBuffer = img.buffer;
           firstImageMime   = img.mime;
         }
-
-        let uploadBuffer = img.buffer;
-        let uploadMime = img.mime;
-        const sizeMB = (uploadBuffer.length / 1024 / 1024).toFixed(2);
-        const isGif = uploadMime === 'image/gif';
-
-        // GIF 超过 5MB 则压缩
-        if (isGif && uploadBuffer.length > GIF_SIZE_LIMIT) {
-          console.warn(`[WeChat] GIF 图片 #${idx} 超过 5MB (${sizeMB}MB)，开始压缩...`);
-          const compressed = await compressGif(uploadBuffer, GIF_SIZE_LIMIT);
-          if (compressed) {
-            uploadBuffer = compressed.buffer;
-            uploadMime = compressed.mime;
-            console.log(`[WeChat] GIF 压缩完成: ${(uploadBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-          } else {
-            console.error(`[WeChat] GIF 图片 #${idx} (${sizeMB}MB) 压缩失败，跳过上传`);
-            return null;
-          }
-        } else if (isGif) {
-          console.log(`[WeChat] GIF 图片 #${idx}: ${sizeMB}MB`);
-        }
-
-        // 非 GIF 图片超过 10MB 限制则跳过
-        if (!isGif && uploadBuffer.length > IMAGE_SIZE_LIMIT) {
-          console.error(`[WeChat] 图片 #${idx} (${sizeMB}MB) 超过微信 10MB 限制，跳过上传`);
-          return null;
-        }
-
-        const filename = `img_${idx}${mimeToExt(uploadMime)}`;
-        const wechatUrl = await uploadArticleImage(uploadBuffer, filename, uploadMime);
+        const filename = `img_${idx}${mimeToExt(img.mime)}`;
+        const wechatUrl = await uploadArticleImage(img.buffer, filename, img.mime);
         return { src: img.src, wechatUrl };
       }));
 
