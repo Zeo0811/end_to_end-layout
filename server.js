@@ -155,7 +155,7 @@ app.delete('/api/accounts/:name', auth, adminOnly, (req, res) => {
 // ── 发布 ──
 
 app.post('/api/publish', auth, async (req, res) => {
-  const { url, accountName, author, digest } = req.body;
+  let { url, accountName, author, digest } = req.body;
   const operator = req.user.username;
 
   if (!url) return res.status(400).json({ error: '缺少链接' });
