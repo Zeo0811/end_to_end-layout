@@ -29,8 +29,7 @@ async function apiCall(method, path, body) {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
   };
   if (body) opts.body = JSON.stringify(body);
-  const timeout = path === '/api/publish' ? 300000 : 30000;
-  const res = await fetch(`${BASE_URL}${path}`, { ...opts, signal: AbortSignal.timeout(timeout) });
+  const res = await fetch(`${BASE_URL}${path}`, opts);
 
   // SSE 流式响应（publish 接口）
   const ct = res.headers.get('content-type') || '';
