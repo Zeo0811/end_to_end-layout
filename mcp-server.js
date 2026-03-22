@@ -29,7 +29,8 @@ async function apiCall(method, path, body) {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
   };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${BASE_URL}${path}`, opts);
+  const timeout = path === '/api/publish' ? 300000 : 30000;
+  const res = await fetch(`${BASE_URL}${path}`, { ...opts, signal: AbortSignal.timeout(timeout) });
 
   // SSE 流式响应（publish 接口）
   const ct = res.headers.get('content-type') || '';
@@ -51,7 +52,7 @@ async function apiCall(method, path, body) {
 const tools = [
   {
     name: 'publish_to_wechat',
-    description: '将 Notion 或飞书公开链接的文档发布到微信公众号草稿箱。需要提供文档的公开分享链接和目标公众号名称。',
+    description: '将 Notion 或飞书公开链接的文档发布到微信公众号草稿箱。需要提供文档的公开分享链接和目标公众号名称。注意：此操作涉及页面解析、图片上传等步骤，通常需要 1-3 分钟完成，请耐心等待结果返回，切勿因等待时间长而重复调用。',
     inputSchema: {
       type: 'object',
       properties: {
