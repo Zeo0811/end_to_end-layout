@@ -82,7 +82,7 @@ function createClient(appId, appSecret) {
       const { body, contentType } = buildMultipart([
         { name: 'media', filename: filename || 'image.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
       ]);
-      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body, signal: AbortSignal.timeout(30000) });
       const data = await res.json();
       if (data.errcode) throw new Error(`上传文章图片失败: [${data.errcode}] ${data.errmsg}`);
       return data.url;
@@ -96,7 +96,7 @@ function createClient(appId, appSecret) {
       const { body, contentType } = buildMultipart([
         { name: 'media', filename: filename || 'thumb.jpg', contentType: mimeType || 'image/jpeg', value: imageBuffer },
       ]);
-      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': contentType }, body, signal: AbortSignal.timeout(30000) });
       const data = await res.json();
       if (data.errcode) throw new Error(`上传永久素材失败: [${data.errcode}] ${data.errmsg}`);
       return { media_id: data.media_id, url: data.url };
@@ -148,23 +148,26 @@ function createClient(appId, appSecret) {
     let firstImageMime   = null;
     let uploaded = 0;
 
+    // 按 src 去重，相同图片只下载上传一次
+    const uniqueSrcs = [...new Set(images.map(img => img.src))];
+
     // 先准备所有图片的 buffer（并发下载）
-    const prepared = await Promise.all(images.map(async (img) => {
+    const prepared = await Promise.all(uniqueSrcs.map(async (src) => {
       try {
-        if (img.src.startsWith('data:')) {
-          const parsed = base64ToBuffer(img.src);
-          return parsed ? { src: img.src, buffer: parsed.buffer, mime: parsed.mimeType } : null;
-        } else if (img.src.startsWith('http')) {
-          const resp = await fetch(img.src, { signal: AbortSignal.timeout(15000) });
+        if (src.startsWith('data:')) {
+          const parsed = base64ToBuffer(src);
+          return parsed ? { src, buffer: parsed.buffer, mime: parsed.mimeType } : null;
+        } else if (src.startsWith('http')) {
+          const resp = await fetch(src, { signal: AbortSignal.timeout(15000) });
           if (!resp.ok) return null;
           return {
-            src: img.src,
+            src,
             buffer: Buffer.from(await resp.arrayBuffer()),
             mime: resp.headers.get('content-type') || 'image/jpeg',
           };
         }
       } catch (err) {
-        console.error('图片下载失败:', img.src.slice(0, 80), err.message);
+        console.error('图片下载失败:', src.slice(0, 80), err.message);
       }
       return null;
     }));
