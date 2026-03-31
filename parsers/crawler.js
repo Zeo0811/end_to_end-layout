@@ -39,7 +39,18 @@ async function ensureBrowser() {
   browser = await chromium.launch({
     headless: true,
     executablePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--js-flags=--max-old-space-size=512',
+    ],
   });
 
   // 监听浏览器断开事件
@@ -74,8 +85,13 @@ function detectPlatform(url) {
 // 包括 blob:、Notion 签名 URL 等服务端无法直接 fetch 的图片
 async function convertAllImages(page) {
   return page.evaluate(async () => {
-    const imgs = document.querySelectorAll('img');
+    const imgs = Array.from(document.querySelectorAll('img'));
+    const MAX_IMAGES = 100; // 最多处理 100 张图片
+    const TIMEOUT_PER_IMG = 5000; // 每张图片最多 5 秒
+    let processed = 0;
+
     for (const img of imgs) {
+      if (processed >= MAX_IMAGES) break;
       const src = img.currentSrc || img.src || '';
       if (!src || src.startsWith('data:')) continue;
       try {
@@ -90,23 +106,32 @@ async function convertAllImages(page) {
             const dataUrl = canvas.toDataURL('image/png');
             if (dataUrl && dataUrl.length > 100) {
               img.src = dataUrl;
+              processed++;
               continue;
             }
           } catch (e) {
             // canvas tainted by CORS, fallback to fetch
           }
         }
-        // fetch 方式（blob: URL 或需要 cookie 的 URL）
-        const resp = await fetch(src, { credentials: 'include' });
-        if (!resp.ok) continue;
-        const blob = await resp.blob();
-        const reader = new FileReader();
-        const dataUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        img.src = dataUrl;
+        // fetch 方式（blob: URL 或需要 cookie 的 URL），带超时
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMEOUT_PER_IMG);
+        try {
+          const resp = await fetch(src, { credentials: 'include', signal: controller.signal });
+          clearTimeout(timer);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          const dataUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          img.src = dataUrl;
+        } catch (e) {
+          clearTimeout(timer);
+        }
+        processed++;
       } catch (e) {}
     }
   });
@@ -232,22 +257,30 @@ async function crawl(url) {
 
     let result;
 
+    const PARSE_TIMEOUT = 30000; // 解析最多 30 秒
+
     if (platform === 'notion') {
-      result = await page.evaluate((parserCode) => {
-        eval(parserCode);
-        return parseNotion();
-      }, notionParserCode);
+      result = await Promise.race([
+        page.evaluate((parserCode) => {
+          eval(parserCode);
+          return parseNotion();
+        }, notionParserCode),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Notion 解析超时')), PARSE_TIMEOUT)),
+      ]);
     } else {
       // 飞书：scrollAndCollect 会滚动页面触发虚拟滚动加载
-      result = await page.evaluate(async (parserCode) => {
-        eval(parserCode);
-        if (typeof scrollAndCollect === 'function') {
-          const sc = await scrollAndCollect();
-          const title = getFeishuTitle();
-          return { type: 'feishu', title, blocks: sc.blocks, links: sc.links };
-        }
-        return parseFeishu();
-      }, feishuParserCode);
+      result = await Promise.race([
+        page.evaluate(async (parserCode) => {
+          eval(parserCode);
+          if (typeof scrollAndCollect === 'function') {
+            const sc = await scrollAndCollect();
+            const title = getFeishuTitle();
+            return { type: 'feishu', title, blocks: sc.blocks, links: sc.links };
+          }
+          return parseFeishu();
+        }, feishuParserCode),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('飞书解析超时')), PARSE_TIMEOUT)),
+      ]);
 
       // 飞书滚动后新加载的图片需要再次转换
       await convertAllImages(page);
@@ -370,10 +403,25 @@ async function autoScroll(page) {
     await new Promise(resolve => {
       let totalHeight = 0;
       const distance = 500;
+      const maxScrolls = 200; // 最多滚动 200 次，防止死循环
+      let scrollCount = 0;
+      let lastScrollHeight = 0;
+      let stuckCount = 0;
       const timer = setInterval(() => {
+        const currentHeight = document.body.scrollHeight;
         window.scrollBy(0, distance);
         totalHeight += distance;
-        if (totalHeight >= document.body.scrollHeight) {
+        scrollCount++;
+
+        // 检测页面高度不再增长（连续 3 次没变化则停止）
+        if (currentHeight === lastScrollHeight) {
+          stuckCount++;
+        } else {
+          stuckCount = 0;
+        }
+        lastScrollHeight = currentHeight;
+
+        if (totalHeight >= currentHeight || scrollCount >= maxScrolls || stuckCount >= 3) {
           window.scrollTo(0, 0);
           clearInterval(timer);
           resolve();
