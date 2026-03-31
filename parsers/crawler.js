@@ -97,11 +97,20 @@ async function convertAllImages(page) {
       try {
         // 用 canvas 方式转换（利用浏览器已加载的图片缓存）
         if (img.complete && img.naturalWidth > 0) {
+          // 限制最大尺寸，防止超大图片占用过多内存
+          const MAX_DIM = 2048;
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          if (w > MAX_DIM || h > MAX_DIM) {
+            const scale = Math.min(MAX_DIM / w, MAX_DIM / h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
           const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
+          canvas.width = w;
+          canvas.height = h;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0, w, h);
           try {
             const dataUrl = canvas.toDataURL('image/png');
             if (dataUrl && dataUrl.length > 100) {
@@ -248,7 +257,10 @@ async function crawl(url) {
     }
 
     // 在浏览器上下文中将所有图片转为 base64（避免服务端 fetch 签名 URL 失败）
-    await convertAllImages(page);
+    await Promise.race([
+      convertAllImages(page),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('图片转换超时')), 60000)),
+    ]).catch(e => console.log(`[Crawler] 图片转换异常: ${e.message}，继续解析...`));
 
     // 提取视频 URL（在解析之前，趁页面还活着）
     const pageVideos = await extractVideoUrls(page);
@@ -283,7 +295,10 @@ async function crawl(url) {
       ]);
 
       // 飞书滚动后新加载的图片需要再次转换
-      await convertAllImages(page);
+      await Promise.race([
+        convertAllImages(page),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('图片转换超时')), 60000)),
+      ]).catch(e => console.log(`[Crawler] 飞书图片转换异常: ${e.message}，继续...`));
 
       // 飞书视频需要 cookie 才能下载，提取当前 session cookies
       const feishuCookies = await context.cookies();
