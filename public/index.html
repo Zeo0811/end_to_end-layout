@@ -23,53 +23,73 @@
     /* ── 登录页 ── */
     .login-page {
       display: flex; align-items: center; justify-content: center; min-height: 100vh;
-      background: linear-gradient(135deg, #f4f9ed 0%, #e8f0de 100%);
+      background: #f5f7f3;
     }
     .login-box {
       background: #fff; border-radius: 16px; padding: 48px 40px; width: 380px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      box-shadow: 0 8px 32px rgba(64,118,0,.1), 0 1px 3px rgba(0,0,0,.05);
     }
-    .login-box .logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 32px; }
+    .login-box .logo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin-bottom: 32px; }
+    .login-box .logo .logo-row { display: flex; align-items: center; gap: 12px; }
     .login-box .logo img { width: 48px; height: 48px; border-radius: 12px; }
-    .login-box .logo span { font-size: 20px; font-weight: 700; color: var(--dark); }
-    .login-box input {
-      width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius);
-      font-size: 14px; outline: none; margin-bottom: 12px; transition: border .2s;
+    .login-box .logo .logo-text { font-size: 20px; font-weight: 700; color: var(--dark); }
+    .login-box .logo .logo-sub { font-size: 13px; color: #999; margin-top: 2px; }
+    .login-field {
+      display: flex; align-items: center; gap: 10px; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0 14px; margin-bottom: 12px; transition: border .2s;
     }
-    .login-box input:focus { border-color: var(--green); }
+    .login-field:focus-within { border-color: var(--green); }
+    .login-field .login-icon { color: #bbb; display: flex; align-items: center; flex-shrink: 0; }
+    .login-field .login-icon svg { width: 18px; height: 18px; }
+    .login-field input {
+      width: 100%; padding: 12px 0; border: none; font-size: 14px; outline: none; background: transparent;
+    }
     .login-box .btn-login {
-      width: 100%; padding: 12px; background: var(--green); color: #fff; border: none;
-      border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
-      margin-top: 8px; transition: background .2s;
+      width: 100%; padding: 12px; background: linear-gradient(135deg, #407600, #4a8800);
+      color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600;
+      cursor: pointer; margin-top: 8px; transition: all .2s;
+      box-shadow: 0 2px 8px rgba(64,118,0,.25);
     }
-    .login-box .btn-login:hover { background: var(--green-dark); }
+    .login-box .btn-login:hover { background: linear-gradient(135deg, #356200, #407600); }
     .login-box .error { color: #d32; font-size: 13px; margin-top: 8px; display: none; }
 
     /* ── 主布局 ── */
     .app { display: none; }
     .header {
-      background: #fff; border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px;
+      background: linear-gradient(135deg, #356200, #407600, #4a8800);
+      box-shadow: 0 2px 8px rgba(64,118,0,.2);
+      padding: 0 24px; height: 56px;
       display: flex; align-items: center; justify-content: space-between;
       position: sticky; top: 0; z-index: 100;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .header-left img { width: 32px; height: 32px; border-radius: 8px; }
-    .header-left .brand { font-size: 16px; font-weight: 700; color: var(--dark); }
+    .header-left .brand { font-size: 16px; font-weight: 700; color: #fff; }
 
     /* Tab 导航 */
     .header-tabs { display: flex; gap: 0; margin-left: 32px; height: 56px; }
     .tab-btn {
       background: none; border: none; cursor: pointer; padding: 0 20px; font-size: 14px;
-      color: #888; border-bottom: 3px solid transparent; transition: color .2s, border-color .2s; outline: none;
+      color: rgba(255,255,255,.5); border-bottom: 3px solid transparent;
+      transition: color .2s, border-color .2s; outline: none;
+      display: flex; align-items: center; gap: 6px;
     }
-    .tab-btn:hover { color: var(--green); }
-    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+    .tab-btn:hover { color: rgba(255,255,255,.8); }
+    .tab-btn.active { color: #fff; border-bottom-color: #fff; font-weight: 600; }
+    .tab-btn .tab-label { display: inline; }
 
-    .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--gray); }
-    .header-right .username { font-weight: 600; color: var(--dark); }
-    .header-right .admin-badge { background: var(--green); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-    .btn-text { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 13px; text-decoration: none; }
-    .btn-text:hover { color: var(--dark); }
+    .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: rgba(255,255,255,.5); }
+    .header-right .username { font-weight: 600; color: #fff; }
+    .header-right .admin-badge { background: rgba(255,255,255,.15); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .btn-text { background: none; border: none; color: rgba(255,255,255,.5); cursor: pointer; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-text:hover { color: #fff; }
+
+    @media (max-width: 768px) {
+      .tab-btn .tab-label { display: none; }
+      .tab-btn { padding: 0 14px; }
+      .header-left .brand { display: none; }
+      .header-right .username { display: none; }
+    }
 
     /* Tab 面板 */
     .tab-panel { display: none; }
@@ -110,9 +130,9 @@
       width: 100%; padding: 14px; color: #fff; border: none; position: relative; overflow: hidden;
       border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer;
       margin-top: 4px; transition: all .2s; letter-spacing: .5px;
-      background: var(--green); z-index: 1;
+      background: linear-gradient(135deg, #407600, #4a8800); z-index: 1;
     }
-    .btn-publish:hover { background: var(--green-dark); }
+    .btn-publish:hover { background: linear-gradient(135deg, #356200, #407600); }
     .btn-publish:disabled { cursor: not-allowed; }
     .btn-publish .progress-fill {
       position: absolute; top: 0; left: 0; height: 100%; width: 0;
@@ -143,15 +163,18 @@
     th { text-align: left; padding: 8px 8px; border-bottom: 2px solid var(--border); color: var(--gray); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
     td { padding: 8px 8px; border-bottom: 1px solid var(--gray-light); vertical-align: middle; }
     tr:hover td { background: #fafffe; }
-    .tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-    .tag-ok  { background: #e6f9e6; color: #270; }
-    .tag-err { background: #fee; color: #a00; }
-    .tag-del { background: #f5f5f5; color: #999; }
+    .tag { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+    .tag-ok  { background: #ecfdf5; color: #16a34a; }
+    .tag-err { background: #fef2f2; color: #dc2626; }
+    .tag-del { background: #f5f5f5; color: #888; }
+    .tag svg { width: 14px; height: 14px; flex-shrink: 0; }
     .btn-del-draft {
       padding: 3px 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;
       color: var(--gray); font-size: 11px; cursor: pointer; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 3px;
     }
     .btn-del-draft:hover { border-color: #d32; color: #d32; }
+    .btn-del-draft svg { width: 12px; height: 12px; }
     .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
     .pagination button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; }
     .pagination button.active { background: var(--green); color: #fff; border-color: var(--green); }
@@ -172,7 +195,8 @@
       transform: scale(.9); transition: transform .2s; text-align: center;
     }
     .modal-overlay.show .modal-box { transform: scale(1); }
-    .modal-icon { font-size: 36px; margin-bottom: 12px; }
+    .modal-icon { font-size: 36px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
+    .modal-icon svg { width: 40px; height: 40px; }
     .modal-title { font-size: 16px; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
     .modal-msg { font-size: 13px; color: var(--gray); line-height: 1.6; margin-bottom: 20px; }
     .modal-btns { display: flex; gap: 10px; }
@@ -187,7 +211,7 @@
 
     /* ── 样式预览 Tab ── */
     #panel-preview { padding: 40px 24px; }
-    .preview-title { text-align: center; font-size: 20px; font-weight: bold; color: #333; margin-bottom: 6px; }
+    .preview-title { text-align: center; font-size: 20px; font-weight: bold; color: var(--dark); margin-bottom: 6px; }
     .preview-sub { text-align: center; font-size: 13px; color: #999; margin-bottom: 36px; }
     .grid {
       display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr);
@@ -243,11 +267,20 @@
   <div class="login-page" id="loginPage">
     <div class="login-box">
       <div class="logo">
-        <img src="/logo.png" alt="Logo">
-        <span>十字路口·公众号排版</span>
+        <div class="logo-row">
+          <img src="/logo.png" alt="Logo">
+          <span class="logo-text">十字路口·公众号排版</span>
+        </div>
+        <span class="logo-sub">公众号排版工具</span>
       </div>
-      <input type="text" id="loginUser" placeholder="用户名" autocomplete="username">
-      <input type="password" id="loginPass" placeholder="密码" autocomplete="current-password">
+      <div class="login-field">
+        <span class="login-icon"><i data-lucide="user"></i></span>
+        <input type="text" id="loginUser" placeholder="用户名" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <span class="login-icon"><i data-lucide="lock"></i></span>
+        <input type="password" id="loginPass" placeholder="密码" autocomplete="current-password">
+      </div>
       <button class="btn-login" onclick="doLogin()">登 录</button>
       <div class="error" id="loginError"></div>
     </div>
@@ -260,15 +293,15 @@
         <img src="/logo.png" alt="Logo">
         <span class="brand">十字路口·公众号排版</span>
         <div class="header-tabs">
-          <button class="tab-btn active" onclick="switchTab('publish')">&#x1F4E4; 发布文章草稿</button>
-          <button class="tab-btn" onclick="switchTab('preview')">&#x1F3A8; 样式预览</button>
+          <button class="tab-btn active" onclick="switchTab('publish')"><i data-lucide="upload" style="width:16px;height:16px;"></i> <span class="tab-label">发布文章草稿</span></button>
+          <button class="tab-btn" onclick="switchTab('preview')"><i data-lucide="eye" style="width:16px;height:16px;"></i> <span class="tab-label">样式预览</span></button>
         </div>
       </div>
       <div class="header-right">
-        <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">&#x2699;&#xFE0F; 管理后台</a>
+        <a href="/admin.html" class="btn-text" id="adminLink" style="display:none"><i data-lucide="settings" style="width:14px;height:14px;"></i> 管理后台</a>
         <span class="username" id="displayName"></span>
         <span class="admin-badge" id="adminBadge" style="display:none">管理员</span>
-        <button class="btn-text" onclick="doLogout()">退出</button>
+        <button class="btn-text" onclick="doLogout()"><i data-lucide="log-out" style="width:14px;height:14px;"></i> 退出</button>
       </div>
     </div>
 
@@ -321,6 +354,20 @@
   </div>
 
   <script>
+    // ══════════════════════════════════
+    //  Inline SVG helpers for dynamic content
+    // ══════════════════════════════════
+    const SVG_CHECK_CIRCLE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+    const SVG_X_CIRCLE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+    const SVG_TRASH2 = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+    const SVG_TRASH2_SM = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+
+    // Modal icon SVGs (40x40)
+    const SVG_MODAL_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#407600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    const SVG_MODAL_MEGAPHONE = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#407600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>';
+    const SVG_MODAL_TRASH = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+    const SVG_MODAL_WARNING = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
     // ══════════════════════════════════
     //  样式预览数据
     // ══════════════════════════════════
@@ -412,7 +459,7 @@
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + name).classList.add('active');
-      event.target.classList.add('active');
+      event.target.closest('.tab-btn').classList.add('active');
     }
 
     // ══════════════════════════════════
@@ -498,8 +545,8 @@
       const author      = document.getElementById('authorInput').value.trim();
       const digest      = document.getElementById('digestInput').value.trim();
 
-      if (!url) return showModal({ icon: '\u270F\uFE0F', title: '提示', msg: '请输入 Notion 或飞书链接', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
-      if (!accountName) return showModal({ icon: '\u{1F4E2}', title: '提示', msg: '请先选择目标公众号', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
+      if (!url) return showModal({ icon: SVG_MODAL_EDIT, title: '提示', msg: '请输入 Notion 或飞书链接', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
+      if (!accountName) return showModal({ icon: SVG_MODAL_MEGAPHONE, title: '提示', msg: '请先选择目标公众号', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
 
       const btn = document.getElementById('publishBtn');
       const btnText = document.getElementById('publishBtnText');
@@ -602,7 +649,7 @@
 
     async function deleteDraft(logId, accountName, mediaId) {
       const ok = await showModal({
-        icon: '\u{1F5D1}\uFE0F',
+        icon: SVG_MODAL_TRASH,
         title: '删除草稿',
         msg: '确定从公众号草稿箱中删除这篇文章？此操作不可撤销。',
         confirmText: '删除',
@@ -637,13 +684,13 @@
           <td class="title-cell" title="${esc(r.url)}">${esc(r.title || '-')}</td>
           <td>${esc(r.account_name)}</td>
           <td>${r.status === 'success'
-            ? '<span class="tag tag-ok">\u2705 成功</span>'
+            ? `<span class="tag tag-ok">${SVG_CHECK_CIRCLE} 成功</span>`
             : r.status === 'deleted'
-              ? '<span class="tag tag-del">\u{1F5D1} 已删除</span>'
-              : `<span class="tag tag-err" title="${esc(r.error_msg)}">\u274C 失败</span>`
+              ? `<span class="tag tag-del">${SVG_TRASH2} 已删除</span>`
+              : `<span class="tag tag-err" title="${esc(r.error_msg)}">${SVG_X_CIRCLE} 失败</span>`
           }</td>
           <td>${r.status === 'success' && r.media_id
-            ? `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">\u{1F5D1} 删除草稿</button>`
+            ? `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">${SVG_TRASH2_SM} 删除草稿</button>`
             : ''
           }</td>
         </tr>`).join('')}</tbody></table>`;
@@ -773,7 +820,7 @@
     let modalResolve = null;
 
     function showModal({ icon, title, msg, confirmText, confirmClass }) {
-      document.getElementById('modalIcon').textContent = icon || '\u26A0\uFE0F';
+      document.getElementById('modalIcon').innerHTML = icon || SVG_MODAL_WARNING;
       document.getElementById('modalTitle').textContent = title || '确认操作';
       document.getElementById('modalMsg').textContent = msg || '';
       const confirmBtn = document.getElementById('modalConfirm');
@@ -812,5 +859,7 @@
       return d.innerHTML;
     }
   </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 </body>
 </html>
