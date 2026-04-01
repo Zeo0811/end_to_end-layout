@@ -220,6 +220,119 @@
       pointer-events: none; display: none; letter-spacing: 1px;
     }
     #fireworks.active + .fw-hint { display: block; }
+
+    /* ══════════════════════════════════════
+       移动端底部 Tab 栏（默认隐藏）
+       ══════════════════════════════════════ */
+    .mobile-tabbar { display: none; }
+
+    /* ══════════════════════════════════════
+       移动端适配 ≤640px
+       ══════════════════════════════════════ */
+    @media (max-width: 640px) {
+      /* ── 安全区域 ── */
+      html { --sab: env(safe-area-inset-bottom, 0px); }
+
+      /* ── Header 精简 ── */
+      .header { height: 48px; padding: 0 16px; }
+      .header-left img { width: 28px; height: 28px; }
+      .header-left .brand { font-size: 14px; }
+      .header-tabs { display: none; }  /* 隐藏顶部Tab，改用底部栏 */
+      .header-right { gap: 10px; font-size: 12px; }
+      .header-right .admin-badge { font-size: 10px; padding: 1px 6px; }
+
+      /* ── 底部 Tab 栏 ── */
+      .mobile-tabbar {
+        display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+        background: #fff; border-top: 1px solid var(--border);
+        z-index: 200; height: calc(56px + var(--sab, 0px));
+        padding-bottom: var(--sab, 0px);
+      }
+      .mtab {
+        flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 2px; background: none; border: none; cursor: pointer;
+        color: #999; font-size: 10px; padding: 6px 0;
+        transition: color .2s;
+      }
+      .mtab svg { width: 22px; height: 22px; }
+      .mtab.active { color: var(--green); font-weight: 600; }
+      .mtab:active { background: var(--gray-light); }
+
+      /* ── 面板全屏化 ── */
+      .tab-panel.active { display: flex; flex-direction: column; }
+      #panel-preview { padding: 16px 12px 80px 12px; }
+      #panel-publish { padding-bottom: 80px; }
+
+      /* ── 登录弹窗 → 底部 Sheet ── */
+      .login-page { align-items: flex-end !important; }
+      .login-box {
+        width: 100% !important; max-width: 100% !important;
+        border-radius: 20px 20px 0 0 !important;
+        padding: 32px 24px calc(24px + var(--sab, 0px)) !important;
+        animation: sheetUp .3s ease;
+      }
+      @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      .login-box .logo span { font-size: 17px; }
+      .login-box input { font-size: 16px; padding: 14px 16px; }  /* 16px 防 iOS 缩放 */
+      .login-box .btn-login { padding: 14px; font-size: 16px; min-height: 48px; }
+
+      /* ── 发布 Tab 布局 ── */
+      .content { flex-direction: column; gap: 12px; padding: 12px; margin: 0; min-height: auto; }
+      .col-left { flex: none; }
+      .col-right { flex: none; }
+
+      /* ── 卡片缩小边距 ── */
+      .card { padding: 18px 16px; border-radius: 10px; }
+      .card h2 { font-size: 16px; margin-bottom: 16px; }
+      .card h3 { font-size: 13px; margin-bottom: 10px; }
+      .field { margin-bottom: 10px; }
+      .field label { font-size: 11px; margin-bottom: 4px; }
+      .field input, .field select { padding: 12px 14px; font-size: 15px; min-height: 44px; }
+      .url-input { font-size: 15px !important; padding: 14px !important; }
+
+      /* ── 发布按钮 ── */
+      .btn-publish { min-height: 48px; font-size: 16px; border-radius: 10px; }
+
+      /* ── 日志：表格 → 卡片列表 ── */
+      .card table { display: none; }
+      .card .mobile-logs { display: block; }
+
+      .log-card {
+        background: var(--gray-light); border-radius: 10px; padding: 14px 16px;
+        margin-bottom: 8px; position: relative;
+      }
+      .log-card-title {
+        font-size: 14px; font-weight: 600; color: var(--dark);
+        margin-bottom: 6px; padding-right: 70px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .log-card-meta { font-size: 11px; color: #999; display: flex; gap: 12px; flex-wrap: wrap; }
+      .log-card-status { position: absolute; top: 14px; right: 16px; }
+      .log-card-actions { margin-top: 8px; }
+      .log-card .btn-del-draft { min-height: 36px; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+
+      /* ── 样式预览 ── */
+      .preview-title { font-size: 17px; margin-bottom: 4px; }
+      .preview-sub { font-size: 12px; margin-bottom: 20px; }
+      .grid { gap: 12px; }
+      .demo-block { padding: 16px 14px; border-radius: 10px; }
+      .demo-label { font-size: 10px; margin-bottom: 10px; }
+
+      /* ── 弹窗适配 ── */
+      .modal-box { padding: 24px 20px 20px; border-radius: 16px; }
+      .modal-icon { font-size: 30px; }
+      .modal-btn { min-height: 44px; font-size: 15px; }
+
+      /* ── 状态栏/日志 ── */
+      .publish-log { font-size: 11px; max-height: 60px; }
+      .status-bar { font-size: 12px; padding: 10px 14px; }
+
+      /* ── 分页 ── */
+      .pagination button { min-width: 36px; min-height: 36px; font-size: 12px; }
+    }
+
+    /* 桌面端隐藏移动端日志卡片 */
+    .mobile-logs { display: none; }
   </style>
 </head>
 <body>
@@ -321,6 +434,18 @@
       <div class="preview-sub">以下为转换后发布到微信公众号的实际渲染效果</div>
       <div class="grid" id="preview-grid"></div>
     </div>
+
+    <!-- 移动端底部 Tab 栏 -->
+    <nav class="mobile-tabbar" id="mobileTabbar">
+      <button class="mtab active" onclick="switchTab('preview')" id="mtab-preview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        <span>样式预览</span>
+      </button>
+      <button class="mtab" onclick="switchTab('publish')" id="mtab-publish">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <span>发布文章</span>
+      </button>
+    </nav>
   </div>
 
   <script>
@@ -416,10 +541,18 @@
         showLoginModal();
         return;
       }
+      // 桌面端顶部Tab
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + name).classList.add('active');
-      event.target.classList.add('active');
+      // 找到对应的桌面tab按钮
+      const idx = name === 'publish' ? 0 : 1;
+      document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
+      // 移动端底部Tab
+      document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
+      const mtab = document.getElementById('mtab-' + name);
+      if (mtab) mtab.classList.add('active');
+
       if (name === 'publish' && token) {
         loadAccounts();
         loadLogs();
@@ -482,8 +615,10 @@
           // 自动切换到发布 tab
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
           document.getElementById('panel-publish').classList.add('active');
           document.querySelectorAll('.tab-btn')[0].classList.add('active');
+          document.getElementById('mtab-publish')?.classList.add('active');
           loadAccounts();
           loadLogs();
         } else { showLoginError(data.error); }
@@ -501,8 +636,10 @@
       // 切换回预览 tab
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
       document.getElementById('panel-preview').classList.add('active');
       document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      document.getElementById('mtab-preview')?.classList.add('active');
       // 更新 header UI
       document.getElementById('displayName').textContent = '';
       document.getElementById('adminBadge').style.display = 'none';
@@ -660,6 +797,18 @@
       } catch (e) { setStatus('error', '\u274C 删除失败: ' + e.message); }
     }
 
+    function statusTag(r) {
+      if (r.status === 'success') return '<span class="tag tag-ok">\u2705 成功</span>';
+      if (r.status === 'deleted') return '<span class="tag tag-del">\u{1F5D1} 已删除</span>';
+      return `<span class="tag tag-err" title="${esc(r.error_msg)}">\u274C 失败</span>`;
+    }
+
+    function deleteBtn(r) {
+      if (r.status === 'success' && r.media_id)
+        return `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">\u{1F5D1} 删除草稿</button>`;
+      return '';
+    }
+
     async function loadLogs(page = 1) {
       const data = await api(`/api/logs?page=${page}&pageSize=15`);
       const container  = document.getElementById('logsContainer');
@@ -671,24 +820,32 @@
         return;
       }
 
-      container.innerHTML = `<table>
+      // 桌面端：表格
+      const tableHtml = `<table>
         <thead><tr><th>时间</th><th>操作人</th><th>文章</th><th>公众号</th><th>状态</th><th></th></tr></thead>
         <tbody>${data.rows.map(r => `<tr>
           <td style="white-space:nowrap">${esc(r.created_at)}</td>
           <td>${esc(r.operator)}</td>
           <td class="title-cell" title="${esc(r.url)}">${esc(r.title || '-')}</td>
           <td>${esc(r.account_name)}</td>
-          <td>${r.status === 'success'
-            ? '<span class="tag tag-ok">\u2705 成功</span>'
-            : r.status === 'deleted'
-              ? '<span class="tag tag-del">\u{1F5D1} 已删除</span>'
-              : `<span class="tag tag-err" title="${esc(r.error_msg)}">\u274C 失败</span>`
-          }</td>
-          <td>${r.status === 'success' && r.media_id
-            ? `<button class="btn-del-draft" onclick="deleteDraft(${r.id},'${esc(r.account_name)}','${esc(r.media_id)}')">\u{1F5D1} 删除草稿</button>`
-            : ''
-          }</td>
+          <td>${statusTag(r)}</td>
+          <td>${deleteBtn(r)}</td>
         </tr>`).join('')}</tbody></table>`;
+
+      // 移动端：卡片列表
+      const cardsHtml = `<div class="mobile-logs">${data.rows.map(r => `
+        <div class="log-card">
+          <div class="log-card-title">${esc(r.title || '-')}</div>
+          <div class="log-card-status">${statusTag(r)}</div>
+          <div class="log-card-meta">
+            <span>${esc(r.created_at)}</span>
+            <span>${esc(r.operator)}</span>
+            <span>${esc(r.account_name)}</span>
+          </div>
+          ${deleteBtn(r) ? `<div class="log-card-actions">${deleteBtn(r)}</div>` : ''}
+        </div>`).join('')}</div>`;
+
+      container.innerHTML = tableHtml + cardsHtml;
 
       const total = Math.ceil(data.total / data.pageSize);
       if (total > 1) {
