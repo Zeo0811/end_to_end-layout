@@ -20,10 +20,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; background: #f0f2f5; color: var(--dark); min-height: 100vh; }
 
-    /* ── 登录页 ── */
+    /* ── 登录页（弹窗覆盖层） ── */
     .login-page {
-      display: flex; align-items: center; justify-content: center; min-height: 100vh;
-      background: linear-gradient(135deg, #f4f9ed 0%, #e8f0de 100%);
+      display: none; align-items: center; justify-content: center;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999;
+      background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
     }
     .login-box {
       background: #fff; border-radius: 16px; padding: 48px 40px; width: 380px;
@@ -46,7 +47,7 @@
     .login-box .error { color: #d32; font-size: 13px; margin-top: 8px; display: none; }
 
     /* ── 主布局 ── */
-    .app { display: none; }
+    .app { display: block; }
     .header {
       background: #fff; border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px;
       display: flex; align-items: center; justify-content: space-between;
@@ -241,7 +242,8 @@
 
   <!-- 登录 -->
   <div class="login-page" id="loginPage">
-    <div class="login-box">
+    <div class="login-box" style="position:relative">
+      <button onclick="hideLoginModal()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:20px;color:#999;cursor:pointer;line-height:1">&times;</button>
       <div class="logo">
         <img src="/logo.png" alt="Logo">
         <span>十字路口·公众号排版</span>
@@ -260,20 +262,21 @@
         <img src="/logo.png" alt="Logo">
         <span class="brand">十字路口·公众号排版</span>
         <div class="header-tabs">
-          <button class="tab-btn active" onclick="switchTab('publish')">&#x1F4E4; 发布文章草稿</button>
-          <button class="tab-btn" onclick="switchTab('preview')">&#x1F3A8; 样式预览</button>
+          <button class="tab-btn" onclick="switchTab('publish')">&#x1F4E4; 发布文章草稿</button>
+          <button class="tab-btn active" onclick="switchTab('preview')">&#x1F3A8; 样式预览</button>
         </div>
       </div>
       <div class="header-right">
         <a href="/admin.html" class="btn-text" id="adminLink" style="display:none">&#x2699;&#xFE0F; 管理后台</a>
         <span class="username" id="displayName"></span>
         <span class="admin-badge" id="adminBadge" style="display:none">管理员</span>
-        <button class="btn-text" onclick="doLogout()">退出</button>
+        <button class="btn-text" id="logoutBtn" onclick="doLogout()" style="display:none">退出</button>
+        <button class="btn-text" id="headerLoginBtn" onclick="showLoginModal()">&#x1F512; 登录</button>
       </div>
     </div>
 
     <!-- Tab 1: 发布 -->
-    <div class="tab-panel active" id="panel-publish">
+    <div class="tab-panel" id="panel-publish">
       <div class="content">
         <div class="col-left">
           <div class="card">
@@ -313,7 +316,7 @@
     </div>
 
     <!-- Tab 2: 样式预览 -->
-    <div class="tab-panel" id="panel-preview">
+    <div class="tab-panel active" id="panel-preview">
       <div class="preview-title">样式预览</div>
       <div class="preview-sub">以下为转换后发布到微信公众号的实际渲染效果</div>
       <div class="grid" id="preview-grid"></div>
@@ -409,10 +412,30 @@
     //  Tab 切换
     // ══════════════════════════════════
     function switchTab(name) {
+      if (name === 'publish' && !token) {
+        showLoginModal();
+        return;
+      }
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + name).classList.add('active');
       event.target.classList.add('active');
+      if (name === 'publish' && token) {
+        loadAccounts();
+        loadLogs();
+      }
+    }
+
+    function showLoginModal() {
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('loginError').style.display = 'none';
+      document.getElementById('loginUser').value = '';
+      document.getElementById('loginPass').value = '';
+      setTimeout(() => document.getElementById('loginUser').focus(), 100);
+    }
+
+    function hideLoginModal() {
+      document.getElementById('loginPage').style.display = 'none';
     }
 
     // ══════════════════════════════════
@@ -435,10 +458,14 @@
         try {
           const data = await api('/api/me');
           currentUser = data.user;
-          showApp();
+          showLoggedInUI();
         } catch { logout(); }
       }
       document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+      // 点击登录弹窗背景关闭
+      document.getElementById('loginPage').addEventListener('click', e => {
+        if (e.target === document.getElementById('loginPage')) hideLoginModal();
+      });
     });
 
     async function doLogin() {
@@ -450,7 +477,15 @@
         if (data.ok) {
           token = data.token; currentUser = data.user;
           localStorage.setItem('token', token);
-          showApp();
+          hideLoginModal();
+          showLoggedInUI();
+          // 自动切换到发布 tab
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          document.getElementById('panel-publish').classList.add('active');
+          document.querySelectorAll('.tab-btn')[0].classList.add('active');
+          loadAccounts();
+          loadLogs();
         } else { showLoginError(data.error); }
       } catch (e) { showLoginError(e.message); }
     }
@@ -463,8 +498,17 @@
     function logout() {
       token = null; currentUser = null;
       localStorage.removeItem('token');
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('app').style.display = 'none';
+      // 切换回预览 tab
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-preview').classList.add('active');
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      // 更新 header UI
+      document.getElementById('displayName').textContent = '';
+      document.getElementById('adminBadge').style.display = 'none';
+      document.getElementById('adminLink').style.display = 'none';
+      document.getElementById('logoutBtn').style.display = 'none';
+      document.getElementById('headerLoginBtn').style.display = '';
     }
 
     function showLoginError(msg) {
@@ -472,16 +516,14 @@
       el.textContent = msg; el.style.display = 'block';
     }
 
-    function showApp() {
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
+    function showLoggedInUI() {
       document.getElementById('displayName').textContent = currentUser.username;
+      document.getElementById('logoutBtn').style.display = '';
+      document.getElementById('headerLoginBtn').style.display = 'none';
       if (currentUser.role === 'admin') {
         document.getElementById('adminBadge').style.display = '';
         document.getElementById('adminLink').style.display = '';
       }
-      loadAccounts();
-      loadLogs();
     }
 
     async function loadAccounts() {
