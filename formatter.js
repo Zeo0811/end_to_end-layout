@@ -120,8 +120,20 @@ function formatToWechat(parsedData) {
     return '<p style="color:red">解析数据为空，请重试</p>';
   }
   const { blocks, links = [] } = parsedData;
+
+  // 跳过开头的空块（空段落、空行），避免文章顶部出现多余空白
+  let startIndex = 0;
+  while (startIndex < blocks.length) {
+    const b = blocks[startIndex];
+    if (b.type === 'paragraph') {
+      const text = (b.content || '').replace(/\u200b/g, '').trim();
+      if (!text) { startIndex++; continue; }
+    }
+    break;
+  }
+
   let html = '';
-  for (const block of blocks) html += renderBlock(block, links, 0);
+  for (let i = startIndex; i < blocks.length; i++) html += renderBlock(blocks[i], links, 0);
   if (links.length > 0) html += renderFootnotes(links);
   return `<section style="${S.wrapper}">${html}</section>`;
 }
