@@ -764,6 +764,7 @@
           const decoder = new TextDecoder();
           let buffer = '';
 
+          let gotDone = false;
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -781,6 +782,7 @@
                   btnText.textContent = data.msg;
                   addLog(data.msg);
                 } else if (data.type === 'done') {
+                  gotDone = true;
                   if (data.ok) {
                     fill.style.width = '100%';
                     btnText.textContent = '发布成功!';
@@ -797,6 +799,11 @@
                 }
               } catch (_) {}
             }
+          }
+          // SSE 流结束但没有收到完成事件 — 服务端可能崩溃或连接中断
+          if (!gotDone) {
+            addLog('\u274C 连接中断，服务端可能内存不足');
+            setStatus('error', '发布失败：服务端连接中断，请稍后重试');
           }
         } else {
           // fallback: 普通 JSON 响应
