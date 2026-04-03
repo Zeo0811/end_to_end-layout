@@ -49,15 +49,7 @@ async function ensureBrowser() {
       '--disable-default-apps',
       '--disable-sync',
       '--disable-translate',
-      '--disable-software-rasterizer',
-      '--disable-canvas-aa',
-      '--disable-2d-canvas-clip-aa',
-      '--disable-gl-drawing-for-tests',
-      '--disable-breakpad',
-      '--disable-component-update',
-      '--disable-domain-reliability',
-      '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
-      '--js-flags=--max-old-space-size=256',
+      '--js-flags=--max-old-space-size=512',
     ],
   });
 
@@ -213,21 +205,6 @@ async function crawl(url) {
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   });
   const page = await context.newPage();
-
-  // 拦截不必要的资源，减少内存占用
-  await page.route('**/*', (route) => {
-    const type = route.request().resourceType();
-    // 屏蔽字体、媒体、websocket 等非必要资源
-    if (['font', 'media', 'websocket', 'manifest', 'texttrack'].includes(type)) {
-      return route.abort();
-    }
-    // 屏蔽常见分析/追踪脚本
-    const url = route.request().url();
-    if (/google-analytics|googletagmanager|segment\.io|amplitude|sentry|intercom|hotjar/.test(url)) {
-      return route.abort();
-    }
-    return route.continue();
-  });
 
   // 拦截并记录所有视频相关的请求 URL（排除缩略图）
   const videoRequestUrls = [];
