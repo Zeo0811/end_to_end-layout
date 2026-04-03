@@ -199,8 +199,17 @@ app.post('/api/publish', auth, async (req, res) => {
     res.end();
   } catch (e) {
     console.error('[Publish] 失败:', e.message);
+    // 把技术性错误翻译为用户能理解的提示
+    let userError = e.message;
+    if (/Target crashed|target closed|Target closed/i.test(e.message)) {
+      userError = '页面内容过大或服务器内存不足，浏览器进程崩溃。建议：1) 检查页面是否已公开 2) 减少文章中的图片数量 3) 稍后重试';
+    } else if (/timeout|超时/i.test(e.message)) {
+      userError = '页面加载超时，请检查链接是否可正常访问';
+    } else if (/net::ERR_/i.test(e.message)) {
+      userError = '无法访问该链接，请检查网络或链接是否正确';
+    }
     db.addLog({ operator, url, title, accountName, mediaId: '', status: 'error', errorMsg: e.message });
-    res.write(`data: ${JSON.stringify({ type: 'done', ok: false, error: e.message, title })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', ok: false, error: userError, title })}\n\n`);
     res.end();
   }
 });

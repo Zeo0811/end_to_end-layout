@@ -49,7 +49,15 @@ async function ensureBrowser() {
       '--disable-default-apps',
       '--disable-sync',
       '--disable-translate',
-      '--js-flags=--max-old-space-size=512',
+      '--disable-software-rasterizer',
+      '--disable-canvas-aa',
+      '--disable-2d-canvas-clip-aa',
+      '--disable-gl-drawing-for-tests',
+      '--disable-breakpad',
+      '--disable-component-update',
+      '--disable-domain-reliability',
+      '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
+      '--js-flags=--max-old-space-size=256',
     ],
   });
 
@@ -206,6 +214,21 @@ async function crawl(url) {
   });
   const page = await context.newPage();
 
+  // 拦截不必要的资源，减少内存占用
+  await page.route('**/*', (route) => {
+    const type = route.request().resourceType();
+    // 屏蔽字体、媒体、websocket 等非必要资源
+    if (['font', 'media', 'websocket', 'manifest', 'texttrack'].includes(type)) {
+      return route.abort();
+    }
+    // 屏蔽常见分析/追踪脚本
+    const url = route.request().url();
+    if (/google-analytics|googletagmanager|segment\.io|amplitude|sentry|intercom|hotjar/.test(url)) {
+      return route.abort();
+    }
+    return route.continue();
+  });
+
   // 拦截并记录所有视频相关的请求 URL（排除缩略图）
   const videoRequestUrls = [];
   page.on('response', response => {
@@ -223,30 +246,26 @@ async function crawl(url) {
       console.log('[Crawler] networkidle 超时，继续尝试...');
     });
 
-    // 检测登录墙 / 未公开页面 — 快速失败，避免后续操作浪费资源或导致崩溃
-    const loginWall = await page.evaluate(() => {
-      const text = document.body?.innerText || '';
-      // Notion 登录页特征
-      if (text.includes('Sign in to see this page') || text.includes('Log in to see this page')) {
-        return 'notion_login';
+    // 检测登录墙 / 未公开页面 — 用轻量级选择器检测，避免 evaluate 占用额外内存
+    const pageTitle = await page.title().catch(() => '');
+    const hasLoginForm = await page.$('input[type="email"], input[placeholder*="email"], input[placeholder*="邮箱"]').catch(() => null);
+    if (hasLoginForm) {
+      if (platform === 'notion') {
+        throw new Error('该 Notion 页面未公开。请在 Notion 中点击右上角「Share」→「Publish」将页面设为公开访问');
+      } else {
+        throw new Error('该飞书文档未公开。请在飞书中将文档设置为「互联网可访问」');
       }
-      // Notion 页面不存在
-      if (text.includes('page not found') || text.includes('This content does not exist')) {
-        return 'not_found';
+    }
+    // 页面标题为平台默认值且无内容选择器 — 可能是 404 或空页面
+    if (platform === 'notion' && pageTitle === 'Notion') {
+      const hasContent = await page.$('[data-block-id], .notion-page-content, [data-content-editable-root]').catch(() => null);
+      if (!hasContent) {
+        // 再用 page.content() 检查是否有 "not found" 字样（比 evaluate 轻量）
+        const html = await page.content().catch(() => '');
+        if (/page not found|does not exist/i.test(html)) {
+          throw new Error('页面不存在或已被删除，请检查链接是否正确');
+        }
       }
-      // 飞书登录页特征
-      if (text.includes('登录飞书') || text.includes('Log in to Lark') || text.includes('Sign in to Feishu')) {
-        return 'feishu_login';
-      }
-      return null;
-    });
-    if (loginWall) {
-      const messages = {
-        notion_login: '该 Notion 页面未公开。请在 Notion 中点击右上角「Share」→「Publish」将页面设为公开访问',
-        not_found: '页面不存在或已被删除，请检查链接是否正确',
-        feishu_login: '该飞书文档未公开。请在飞书中将文档设置为「互联网可访问」',
-      };
-      throw new Error(messages[loginWall]);
     }
 
     if (platform === 'notion') {
