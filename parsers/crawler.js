@@ -223,6 +223,32 @@ async function crawl(url) {
       console.log('[Crawler] networkidle 超时，继续尝试...');
     });
 
+    // 检测登录墙 / 未公开页面 — 快速失败，避免后续操作浪费资源或导致崩溃
+    const loginWall = await page.evaluate(() => {
+      const text = document.body?.innerText || '';
+      // Notion 登录页特征
+      if (text.includes('Sign in to see this page') || text.includes('Log in to see this page')) {
+        return 'notion_login';
+      }
+      // Notion 页面不存在
+      if (text.includes('page not found') || text.includes('This content does not exist')) {
+        return 'not_found';
+      }
+      // 飞书登录页特征
+      if (text.includes('登录飞书') || text.includes('Log in to Lark') || text.includes('Sign in to Feishu')) {
+        return 'feishu_login';
+      }
+      return null;
+    });
+    if (loginWall) {
+      const messages = {
+        notion_login: '该 Notion 页面未公开。请在 Notion 中点击右上角「Share」→「Publish」将页面设为公开访问',
+        not_found: '页面不存在或已被删除，请检查链接是否正确',
+        feishu_login: '该飞书文档未公开。请在飞书中将文档设置为「互联网可访问」',
+      };
+      throw new Error(messages[loginWall]);
+    }
+
     if (platform === 'notion') {
       // 多种选择器，兼容不同版本 Notion 公开页面
       const notionSelectors = [
