@@ -117,8 +117,9 @@
     .field label { display: block; font-size: 12px; font-weight: 600; color: var(--gray); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
     .field input, .field select {
       width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-      font-size: 14px; outline: none; transition: border .2s; font-family: inherit;
+      font-size: 14px; outline: none; transition: border .2s; font-family: inherit; box-sizing: border-box;
     }
+    .field select { padding-right: 36px; }
     .field input:focus, .field select:focus { border-color: var(--green); }
 
     .url-input {
