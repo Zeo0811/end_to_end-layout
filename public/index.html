@@ -232,7 +232,36 @@
     }
     .divider-line { border: none; border-top: 1px dashed #ddd; margin: 0 0 16px 0; }
 
-    /* ── 烟花 ── */
+    /* ── 插件下载 Tab ── */
+    #panel-plugin { padding: 40px 24px; }
+    .plugin-page { max-width: 720px; margin: 0 auto; }
+    .plugin-hero { text-align: center; margin-bottom: 40px; }
+    .plugin-hero h1 { font-size: 22px; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
+    .plugin-hero p { font-size: 14px; color: #888; margin: 0; }
+    .plugin-badge-row { display: flex; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .plugin-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+    .plugin-section-title { font-size: 17px; font-weight: 700; color: var(--dark); margin: 36px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--green); display: flex; align-items: center; gap: 10px; }
+    .plugin-num { width: 26px; height: 26px; background: var(--green); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+    .plugin-alert { background: var(--green-light); border: 1px solid var(--green-border); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #3d6300; line-height: 1.6; margin-bottom: 16px; }
+    .plugin-steps { display: flex; flex-direction: column; gap: 12px; }
+    .plugin-step { background: #fff; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; gap: 14px; align-items: flex-start; }
+    .plugin-step-num { width: 30px; height: 30px; min-width: 30px; background: var(--green-light); border: 2px solid var(--green); border-radius: 50%; color: var(--green); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+    .plugin-step-body { flex: 1; min-width: 0; }
+    .plugin-step-body h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--dark); }
+    .plugin-step-body p { margin: 0; font-size: 13px; color: #555; line-height: 1.7; }
+    .plugin-step-body code { display: inline-block; background: #f4f4f4; border: 1px solid #e0e0e0; border-radius: 4px; font-family: monospace; font-size: 12px; padding: 1px 6px; color: #333; }
+    .plugin-tip { margin-top: 8px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #7c5600; line-height: 1.5; }
+    .plugin-tip.plugin-tip-ok { background: var(--green-light); border-color: var(--green-border); color: #3d6300; }
+    .plugin-dl-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--green); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; margin-top: 8px; transition: background .2s; }
+    .plugin-dl-btn:hover { background: var(--green-dark); }
+    .plugin-faq { display: flex; flex-direction: column; gap: 10px; margin-bottom: 40px; }
+    .plugin-faq-item { background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .plugin-faq-q { font-weight: 600; color: var(--dark); font-size: 13px; margin-bottom: 6px; }
+    .plugin-faq-q::before { content: 'Q '; color: var(--green); font-weight: 700; }
+    .plugin-faq-a { font-size: 13px; color: #555; line-height: 1.7; padding-left: 18px; }
+    .plugin-faq-a code { display: inline-block; background: #f4f4f4; border: 1px solid #e0e0e0; border-radius: 4px; font-family: monospace; font-size: 12px; padding: 1px 6px; color: #333; }
+
+    /* ── 烟��� ── */
     #fireworks {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: 9999; cursor: pointer; display: none;
@@ -287,6 +316,9 @@
       .tab-panel.active { display: flex; flex-direction: column; }
       #panel-preview { padding: 16px 12px 80px 12px; }
       #panel-publish { padding-bottom: 80px; }
+      #panel-plugin { padding: 16px 12px 80px 12px; }
+      .plugin-hero h1 { font-size: 18px; }
+      .plugin-page { max-width: 100%; }
 
       /* ── 登录弹窗 → 底部 Sheet ── */
       .login-page { align-items: flex-end !important; }
@@ -411,6 +443,7 @@
         <div class="header-tabs">
           <button class="tab-btn" onclick="switchTab('publish')"><i data-lucide="upload" style="width:16px;height:16px;"></i> <span class="tab-label">发布文章草稿</span></button>
           <button class="tab-btn active" onclick="switchTab('preview')"><i data-lucide="eye" style="width:16px;height:16px;"></i> <span class="tab-label">样式预览</span></button>
+          <button class="tab-btn" onclick="switchTab('plugin')"><i data-lucide="download" style="width:16px;height:16px;"></i> <span class="tab-label">插件下载</span></button>
         </div>
       </div>
       <div class="header-right">
@@ -469,6 +502,115 @@
       <div class="grid" id="preview-grid"></div>
     </div>
 
+    <!-- Tab 3: 插件下载 -->
+    <div class="tab-panel" id="panel-plugin">
+      <div class="plugin-page">
+        <div class="plugin-hero">
+          <h1>十字路口排版插件</h1>
+          <p>网页版无法使用时，可下载 Chrome 插件作为替代方案</p>
+          <div class="plugin-badge-row">
+            <span class="plugin-badge">Chrome 扩展</span>
+            <span class="plugin-badge">支持飞书文档</span>
+            <span class="plugin-badge">支持 Notion</span>
+            <span class="plugin-badge">免费开源</span>
+          </div>
+        </div>
+
+        <div class="plugin-section-title"><span class="plugin-num">1</span> 下载 &amp; 安装插件</div>
+        <div class="plugin-alert">目前插件尚未上架 Chrome 应用商店，需要通过「开发者模式」手动安装，整个过程约 1 分钟。</div>
+
+        <div class="plugin-steps">
+          <div class="plugin-step">
+            <div class="plugin-step-num">1</div>
+            <div class="plugin-step-body">
+              <h3>下载插件压缩包</h3>
+              <p>点击下方按钮，下载最新版 <code>chrome-extension.zip</code>。</p>
+              <a class="plugin-dl-btn" href="https://github.com/Zeo0811/Layout-design/raw/main/chrome-extension.zip" target="_blank">
+                <i data-lucide="download" style="width:16px;height:16px;"></i> 下载 chrome-extension.zip
+              </a>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <div class="plugin-step-num">2</div>
+            <div class="plugin-step-body">
+              <h3>解压文件</h3>
+              <p>将下载的 zip 包解压到任意位置。解压后你会看到一个 <code>chrome-extension/</code> 文件夹。</p>
+              <div class="plugin-tip">请保留解压后的文件夹，删除它会导致插件失效。</div>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <div class="plugin-step-num">3</div>
+            <div class="plugin-step-body">
+              <h3>打开 Chrome 扩展管理页</h3>
+              <p>在 Chrome 地址栏输入并回车：<code>chrome://extensions/</code></p>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <div class="plugin-step-num">4</div>
+            <div class="plugin-step-body">
+              <h3>开启「开发者模式」</h3>
+              <p>在扩展管理页右上角，找到「<strong>开发者模式</strong>」开关并打开。</p>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <div class="plugin-step-num">5</div>
+            <div class="plugin-step-body">
+              <h3>加载已解压的扩展程序</h3>
+              <p>点击左上角「<strong>加载已解压的扩展程序</strong>」按钮，选择解压的 <code>chrome-extension/</code> 文件夹。</p>
+              <div class="plugin-tip plugin-tip-ok">安装成功后，扩展管理页会出现「十字路口排版」卡片，工具栏也会显示插件图标。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plugin-section-title"><span class="plugin-num">2</span> 使用方法</div>
+        <div class="plugin-steps">
+          <div class="plugin-step">
+            <div class="plugin-step-num">1</div>
+            <div class="plugin-step-body">
+              <h3>打开需要转换的文章</h3>
+              <p>在 Chrome 中打开飞书文档或 Notion 页面。</p>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <div class="plugin-step-num">2</div>
+            <div class="plugin-step-body">
+              <h3>点击插件图标</h3>
+              <p>点击 Chrome 工具栏右侧的插件图标，弹出插件面板。</p>
+              <p style="color:#999;font-size:12px;margin-top:4px;">找不到图标？点击工具栏拼图图标 → 将「十字路口排版」固定到工具栏。</p>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <div class="plugin-step-num">3</div>
+            <div class="plugin-step-body">
+              <h3>一键转换 &amp; 复制</h3>
+              <p>点击「一键转换」按钮，转换完成后点击「复制内容」，粘贴到公众号编辑器即可。</p>
+              <div class="plugin-tip plugin-tip-ok">粘贴后样式会自动应用，包括标题、引用块、代码块、表格等全部格式。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plugin-section-title"><span class="plugin-num">3</span> 常见问题</div>
+        <div class="plugin-faq">
+          <div class="plugin-faq-item">
+            <div class="plugin-faq-q">点击「一键转换」没有反应？</div>
+            <div class="plugin-faq-a">请确认当前页面是飞书文档或 Notion 页面。如果是首次使用，刷新页面后再试。</div>
+          </div>
+          <div class="plugin-faq-item">
+            <div class="plugin-faq-q">Chrome 提示「此扩展程序可能已损坏」？</div>
+            <div class="plugin-faq-a">未上架应用商店的正常提示，不影响使用，点击「取消」忽略即可。</div>
+          </div>
+          <div class="plugin-faq-item">
+            <div class="plugin-faq-q">粘贴到公众号后样式不对？</div>
+            <div class="plugin-faq-a">请确保使用的是公众号后台的「富文本编辑器」，不要使用「源码编辑器」模式。</div>
+          </div>
+          <div class="plugin-faq-item">
+            <div class="plugin-faq-q">Chrome 更新后插件消失了？</div>
+            <div class="plugin-faq-a">重新打开 <code>chrome://extensions/</code>，点击「加载已解压的扩展程序」重新加载即可。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 移动端底部 Tab 栏 -->
     <nav class="mobile-tabbar" id="mobileTabbar">
       <button class="mtab active" onclick="switchTab('preview')" id="mtab-preview">
@@ -478,6 +620,10 @@
       <button class="mtab" onclick="switchTab('publish')" id="mtab-publish">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         <span>发布文章</span>
+      </button>
+      <button class="mtab" onclick="switchTab('plugin')" id="mtab-plugin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>插件下载</span>
       </button>
     </nav>
   </div>
@@ -594,8 +740,9 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + name).classList.add('active');
       // 找到对应的桌面tab按钮
-      const idx = name === 'publish' ? 0 : 1;
-      document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
+      const tabNames = ['publish', 'preview', 'plugin'];
+      const idx = tabNames.indexOf(name);
+      if (idx >= 0) document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
       // 移动端底部Tab
       document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
       const mtab = document.getElementById('mtab-' + name);
