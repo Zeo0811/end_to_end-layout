@@ -209,7 +209,8 @@ function renderBlock(block, links, depth) {
 }
 
 function renderCallout(block) {
-  return `<section style="${S.callout_wrapper}">${pi(block.content)}</section>`;
+  const content = pi(block.content).replace(/^(<br\s*\/?>)+|(<br\s*\/?>)+$/g, '');
+  return `<section style="${S.callout_wrapper}">${content}</section>`;
 }
 
 function applyHljsStyles(html) {
