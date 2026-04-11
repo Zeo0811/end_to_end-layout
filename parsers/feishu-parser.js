@@ -537,10 +537,16 @@ function convertFeishuNodeToHtml(node, links) {
       continue;
     }
 
-    // Block-level elements: preserve line breaks between them
+    // Block-level elements: preserve line breaks and empty lines between them
     if (tag === 'div' || tag === 'p') {
-      if (html && inner) html += '<br>';
-      html += inner;
+      const stripped = inner.replace(/<br\s*\/?>/g, '').trim();
+      if (!stripped) {
+        // Empty block = empty line
+        html += '<br>';
+      } else {
+        if (html) html += '<br>';
+        html += inner;
+      }
       continue;
     }
 

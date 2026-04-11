@@ -298,10 +298,16 @@ function convertNodeToHtml(node, links) {
       continue;
     }
 
-    // Block-level elements: preserve line breaks between them
+    // Block-level elements: preserve line breaks and empty lines between them
     if (tag === 'div' || tag === 'p') {
-      if (html && innerHtml) html += '<br>';
-      html += innerHtml;
+      const stripped = innerHtml.replace(/<br\s*\/?>/g, '').trim();
+      if (!stripped) {
+        // Empty block = empty line
+        html += '<br>';
+      } else {
+        if (html) html += '<br>';
+        html += innerHtml;
+      }
       continue;
     }
 
