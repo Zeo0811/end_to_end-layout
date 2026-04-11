@@ -537,6 +537,13 @@ function convertFeishuNodeToHtml(node, links) {
       continue;
     }
 
+    // Block-level elements: preserve line breaks between them
+    if (tag === 'div' || tag === 'p') {
+      if (html && inner) html += '<br>';
+      html += inner;
+      continue;
+    }
+
     const isBold   = tag === 'strong' || tag === 'b' ||
       cls.includes('bold') ||
       style.includes('font-weight:700')  || style.includes('font-weight: 700') ||
