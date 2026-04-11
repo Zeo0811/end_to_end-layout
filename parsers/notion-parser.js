@@ -298,6 +298,13 @@ function convertNodeToHtml(node, links) {
       continue;
     }
 
+    // Block-level elements: preserve line breaks between them
+    if (tag === 'div' || tag === 'p') {
+      if (html && innerHtml) html += '<br>';
+      html += innerHtml;
+      continue;
+    }
+
     html += innerHtml;
   }
 
