@@ -534,7 +534,7 @@ function convertFeishuNodeToHtml(node, links, context) {
       // callout 内的公众号链接：直接渲染为跳转链接，不进参考资料列表
       if (context === 'callout' && isWechatArticleUrl(href) && text) {
         const safeHref = href.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-        html += `<a href="${safeHref}">${escapeFeishuHtml(text)}</a>`;
+        html += `<a href="${safeHref}" data-wechat-callout="1">${escapeFeishuHtml(text)}</a>`;
         continue;
       }
       if (href && !href.startsWith('#') && text) {

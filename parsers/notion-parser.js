@@ -266,7 +266,7 @@ function convertNodeToHtml(node, links, context) {
       const text = child.textContent.trim();
       // callout 内的公众号链接：直接渲染为跳转链接，不进参考资料列表
       if (context === 'callout' && isWechatArticleUrl(href) && text) {
-        html += `<a href="${escapeHtml(href)}">${escapeHtml(text)}</a>`;
+        html += `<a href="${escapeHtml(href)}" data-wechat-callout="1">${escapeHtml(text)}</a>`;
         continue;
       }
       if (href && !href.startsWith('#') && text) {
