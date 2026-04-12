@@ -327,8 +327,13 @@ function pi(html) {
       `<code style="${S.code_inline}">$1</code>`)
     .replace(/<s>([\s\S]*?)<\/s>/g,
       `<s style="${S.s}">$1</s>`)
-    .replace(/<a\s+href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g,
-      `<a href="$1" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:break-all;">$2</a>`)
+    .replace(/<a\s+href="([^"]*)"([^>]*)>([\s\S]*?)<\/a>/g, (_, href, attrs, text) => {
+      // callout 内公众号跳转链接：不加下划线
+      if (attrs.includes('data-wechat-callout')) {
+        return `<a href="${href}" style="text-decoration:none;color:#222222;word-break:break-all;">${text}</a>`;
+      }
+      return `<a href="${href}" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:break-all;">${text}</a>`;
+    })
     .replace(/<sup>\[(\d+)\]<\/sup>/g,
       `<sup style="font-size:.7em;color:#222222;font-weight:bold;line-height:0;vertical-align:super;">[$1]</sup>`);
 }
