@@ -230,7 +230,7 @@ function extractNotionRichText(blockEl, links) {
   return convertNodeToHtml(contentEl, links);
 }
 
-function convertNodeToHtml(node, links) {
+function convertNodeToHtml(node, links, context) {
   let html = '';
 
   for (const child of node.childNodes) {
@@ -242,7 +242,7 @@ function convertNodeToHtml(node, links) {
 
     const tag = child.tagName.toLowerCase();
     const style = child.getAttribute('style') || '';
-    const innerHtml = convertNodeToHtml(child, links);
+    const innerHtml = convertNodeToHtml(child, links, context);
 
     if (tag === 'br') { html += '<br>'; continue; }
 
@@ -264,6 +264,11 @@ function convertNodeToHtml(node, links) {
     if (tag === 'a') {
       const href = child.getAttribute('href') || '';
       const text = child.textContent.trim();
+      // callout 内的公众号链接：直接渲染为跳转链接，不进参考资料列表
+      if (context === 'callout' && isWechatArticleUrl(href) && text) {
+        html += `<a href="${escapeHtml(href)}">${escapeHtml(text)}</a>`;
+        continue;
+      }
       if (href && !href.startsWith('#') && text) {
         const existing = links.findIndex(l => l.url === href);
         const idx = existing >= 0 ? existing + 1 : (links.push({ text, url: href }), links.length);
@@ -354,7 +359,11 @@ function parseNotionCallout(el, links) {
     clone.querySelector('[class*="icon"]');
   if (cloneIcon) cloneIcon.remove();
 
-  return { type: 'callout', icon, content: convertNodeToHtml(clone, links) };
+  return { type: 'callout', icon, content: convertNodeToHtml(clone, links, 'callout') };
+}
+
+function isWechatArticleUrl(url) {
+  return typeof url === 'string' && /^https?:\/\/mp\.weixin\.qq\.com(\/|$)/i.test(url);
 }
 
 function parseNotionImage(el) {

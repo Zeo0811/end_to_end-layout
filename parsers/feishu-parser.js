@@ -338,7 +338,7 @@ function parseFeishuBlock(el, blockType, links) {
       const clone = el.cloneNode(true);
       const cloneIcon = clone.querySelector('[class*="icon"]') || clone.querySelector('[class*="emoji"]');
       if (cloneIcon) cloneIcon.remove();
-      return { type: 'callout', icon, content: extractFeishuText(clone, links) };
+      return { type: 'callout', icon, content: extractFeishuText(clone, links, 'callout') };
     }
 
     case 'todo': {
@@ -496,11 +496,15 @@ function parseFeishuTable(el, links) {
   return rows.length > 0 ? { type: 'table', rows } : null;
 }
 
-function extractFeishuText(el, links) {
-  return convertFeishuNodeToHtml(el, links);
+function extractFeishuText(el, links, context) {
+  return convertFeishuNodeToHtml(el, links, context);
 }
 
-function convertFeishuNodeToHtml(node, links) {
+function isWechatArticleUrl(url) {
+  return typeof url === 'string' && /^https?:\/\/mp\.weixin\.qq\.com(\/|$)/i.test(url);
+}
+
+function convertFeishuNodeToHtml(node, links, context) {
   let html = '';
   for (const child of node.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
@@ -512,7 +516,7 @@ function convertFeishuNodeToHtml(node, links) {
     const tag   = child.tagName.toLowerCase();
     const cls   = child.getAttribute('class') || '';
     const style = child.getAttribute('style') || '';
-    const inner = convertFeishuNodeToHtml(child, links);
+    const inner = convertFeishuNodeToHtml(child, links, context);
 
     if (tag === 'br') { html += '<br>'; continue; }
 
@@ -527,6 +531,12 @@ function convertFeishuNodeToHtml(node, links) {
     if (tag === 'a') {
       const href = child.getAttribute('href') || '';
       const text = child.textContent.trim();
+      // callout 内的公众号链接：直接渲染为跳转链接，不进参考资料列表
+      if (context === 'callout' && isWechatArticleUrl(href) && text) {
+        const safeHref = href.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        html += `<a href="${safeHref}">${escapeFeishuHtml(text)}</a>`;
+        continue;
+      }
       if (href && !href.startsWith('#') && text) {
         const existing = links.findIndex(l => l.url === href);
         const idx = existing >= 0 ? existing + 1 : (links.push({ text, url: href }), links.length);
