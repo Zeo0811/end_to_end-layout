@@ -246,21 +246,38 @@ function renderCodeBlock(block) {
   return `<section style="${S.code_wrapper}">${topBar}${langBar}<pre style="${S.code_pre}"><code style="${S.code_text}">${codeHtml}</code></pre></section>`;
 }
 
+function isAllBold(content) {
+  if (!content) return false;
+  const trimmed = String(content).trim();
+  if (!trimmed) return false;
+  // Strip <strong>...</strong> wrappers, then strip remaining inline tags (br, sup, etc.)
+  const stripped = trimmed.replace(/<strong>[\s\S]*?<\/strong>/g, '');
+  const remaining = stripped.replace(/<[^>]+>/g, '').trim();
+  return !remaining;
+}
+
 function renderList(items, isOrdered, depth) {
   if (!items || items.length === 0) return '';
   const indent = depth > 0 ? `padding-left: ${depth * 1.5}em;` : '';
   const baseStyle = `text-align: left; line-height: 26px; font-family: ${FONT}; margin: 5px 0; letter-spacing: 0.1em; color: rgb(63,63,63); font-size: 15px; ${indent}`;
   const markerStyle = `display: inline-block; min-width: 1.5em; margin-right: 0.3em;`;
+  const boldMarkerStyle = `${markerStyle} font-weight: 600; color: #407600;`;
 
   let html = '';
   items.forEach((item, index) => {
     const marker = isOrdered ? `${index + 1}.` : '\u2022';
+    const itemMarkerStyle = isAllBold(item.content) ? boldMarkerStyle : markerStyle;
     let nested = '';
     if (item.children && item.children.length > 0) {
       for (const child of item.children) nested += renderBlock(child, [], depth + 1);
     }
-    html += `<p style="${baseStyle}"><span style="${markerStyle}">${marker}</span>${pi(item.content)}</p>${nested}`;
+    html += `<p style="${baseStyle}"><span style="${itemMarkerStyle}">${marker}</span>${pi(item.content)}</p>${nested}`;
   });
+
+  // Top-level lists need extra bottom spacing to match paragraph padding
+  if (depth === 0) {
+    return `<section style="margin-bottom: 1em;">${html}</section>`;
+  }
   return html;
 }
 
