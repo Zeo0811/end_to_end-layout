@@ -150,9 +150,7 @@ function renderBlock(block, links, depth) {
 
     case 'paragraph': {
       const text = (block.content || '').replace(/\u200b/g, '').trim();
-      // \u7a7a\u6bb5\u843d\u76f4\u63a5\u8df3\u8fc7\uff1a<p> \u81ea\u5e26 padding-bottom \u5df2\u662f\u6bb5\u95f4\u8ddd\uff0c
-      // \u518d\u8865 <br> \u4f1a\u5728\u6bb5\u4e4b\u95f4\u591a\u51fa\u4e00\u4e2a\u89c6\u89c9\u7a7a\u884c\u3002
-      if (!text) return '';
+      if (!text) return '<br>';
       return applyS('p', pi(block.content), 'p');
     }
 

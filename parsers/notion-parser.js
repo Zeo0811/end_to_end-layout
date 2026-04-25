@@ -303,16 +303,11 @@ function convertNodeToHtml(node, links, context) {
       continue;
     }
 
-    // Block-level elements: preserve line breaks and empty lines between them
+    // 块级元素（div/p）之间插入换行，空块直接丢弃
+    // 注意：必须用 html.trim() 判断前置内容，否则前一个 <br> 会导致再叠一个 <br>，段内多空行
     if (tag === 'div' || tag === 'p') {
-      const stripped = innerHtml.replace(/<br\s*\/?>/g, '').trim();
-      if (!stripped) {
-        // Empty block = empty line
-        html += '<br>';
-      } else {
-        if (html) html += '<br>';
-        html += innerHtml;
-      }
+      if (html.trim()) html += '<br>';
+      if (innerHtml.trim()) html += innerHtml;
       continue;
     }
 
