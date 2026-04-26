@@ -338,7 +338,11 @@ function parseFeishuBlock(el, blockType, links) {
       const clone = el.cloneNode(true);
       const cloneIcon = clone.querySelector('[class*="icon"]') || clone.querySelector('[class*="emoji"]');
       if (cloneIcon) cloneIcon.remove();
-      return { type: 'callout', icon, content: extractFeishuText(clone, links, 'callout') };
+      const raw = extractFeishuText(clone, links, 'callout');
+      const content = raw
+        .replace(/^(\s*<br\s*\/?>)+\s*/i, '')
+        .replace(/\s*(<br\s*\/?>[\s]*)+$/i, '');
+      return { type: 'callout', icon, content };
     }
 
     case 'todo': {
@@ -547,16 +551,11 @@ function convertFeishuNodeToHtml(node, links, context) {
       continue;
     }
 
-    // Block-level elements: preserve line breaks and empty lines between them
+    // 块级元素（div/p）之间插入换行，空块直接丢弃
+    // 注意：必须用 html.trim() 判断前置内容，否则前一个 <br> 会再叠一个 <br>
     if (tag === 'div' || tag === 'p') {
-      const stripped = inner.replace(/<br\s*\/?>/g, '').trim();
-      if (!stripped) {
-        // Empty block = empty line
-        html += '<br>';
-      } else {
-        if (html) html += '<br>';
-        html += inner;
-      }
+      if (html.trim()) html += '<br>';
+      if (inner.trim()) html += inner;
       continue;
     }
 
