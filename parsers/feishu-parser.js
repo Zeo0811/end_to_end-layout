@@ -317,8 +317,13 @@ function parseFeishuBlock(el, blockType, links) {
     case 'paragraph':
       return { type: 'paragraph', content: extractFeishuText(el, links) };
 
-    case 'quote':
-      return { type: 'quote', content: extractFeishuText(el, links) };
+    case 'quote': {
+      const raw = extractFeishuText(el, links);
+      const content = raw
+        .replace(/^(\s*<br\s*\/?>)+\s*/i, '')
+        .replace(/\s*(<br\s*\/?>[\s]*)+$/i, '');
+      return { type: 'quote', content };
+    }
 
     case 'code': {
       const language = el.getAttribute('data-language') ||
