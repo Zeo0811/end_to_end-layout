@@ -531,6 +531,7 @@ function convertFeishuNodeToHtml(node, links, context) {
 
     // 飞书行尾自动插入的 enter 标记（含零宽空格），直接跳过
     if (child.getAttribute('data-enter') === 'true') continue;
+    if (child.getAttribute('data-zero-space') === 'true') continue;
 
     if (tag === 'code' || cls.includes('code')) {
       html += `<code>${escapeFeishuHtml(child.textContent)}</code>`;
