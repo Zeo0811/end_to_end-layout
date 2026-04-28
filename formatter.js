@@ -155,8 +155,9 @@ function renderBlock(block, links, depth) {
 
     case 'quote': {
       const bwVal = S.blockquote_wrapper || '';
-      if (bwVal.includes('{{content}}')) return bwVal.replace('{{content}}', pi(block.content));
-      return `<section style="${bwVal}">${pi(block.content)}</section>`;
+      const content = pi(block.content).replace(/^(<br\s*\/?>)+|(<br\s*\/?>)+$/g, '');
+      if (bwVal.includes('{{content}}')) return bwVal.replace('{{content}}', content);
+      return `<section style="${bwVal}">${content}</section>`;
     }
 
     case 'callout':
