@@ -64,8 +64,7 @@ const S = {
   code_inline: `background: rgba(135,131,120,.15); border-radius: 4px; font-size: 85%; padding: 0.2em 0.4em; color: #222222; font-family: ${MONO};`,
   s: `text-decoration: line-through; color: #888888;`,
 
-  blockquote_wrapper: `line-height: 26px; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 20px 0; border-left: 3px solid #407600; background-color: #f5f5f5; font-family: ${FONT};`,
-  blockquote_text: `text-align: left; line-height: 26px; font-family: ${FONT}; margin: 0; letter-spacing: 0.1em; color: #407600; font-size: 15px;`,
+  blockquote_wrapper: `line-height: 26px; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 20px 0; border-left: 3px solid #407600; background-color: #f5f5f5; font-family: ${FONT}; letter-spacing: 0.1em; color: #407600; font-size: 15px;`,
 
   callout_wrapper: `font-size: 15px; white-space: normal; margin: 20px 0; color: #3f3f3f; font-family: ${FONT}; line-height: 26px; letter-spacing: 0.1em; background-color: #f9fdf5; border: 1px solid #407600; border-radius: 8px; padding: 16px 20px;`,
   callout_content: ``,
@@ -157,7 +156,7 @@ function renderBlock(block, links, depth) {
     case 'quote': {
       const bwVal = S.blockquote_wrapper || '';
       if (bwVal.includes('{{content}}')) return bwVal.replace('{{content}}', pi(block.content));
-      return `<section style="${bwVal}"><p style="${S.blockquote_text}">${pi(block.content)}</p></section>`;
+      return `<section style="${bwVal}">${pi(block.content)}</section>`;
     }
 
     case 'callout':
