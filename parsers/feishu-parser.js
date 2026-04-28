@@ -153,7 +153,7 @@ function getFeishuTitle() {
   for (const el of candidates) {
     if (el && el.textContent.trim()) return el.textContent.trim();
   }
-  return document.title.replace(/- 飞书.*/g, '').replace(/\| 飞书.*/g, '').trim();
+  return document.title.replace(/\s*[-|｜]\s*(飞书|Feishu|Lark).*/gi, '').trim();
 }
 
 // ── 核心：找"块父 === 容器"的块，避免嵌套块被重复处理 ─────────────────────
