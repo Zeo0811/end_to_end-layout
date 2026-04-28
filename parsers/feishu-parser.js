@@ -320,6 +320,7 @@ function parseFeishuBlock(el, blockType, links) {
     case 'quote': {
       const raw = extractFeishuText(el, links);
       const content = raw
+        .replace(/\u200b/g, '')
         .replace(/^(\s*<br\s*\/?>)+\s*/i, '')
         .replace(/\s*(<br\s*\/?>[\s]*)+$/i, '');
       return { type: 'quote', content };
