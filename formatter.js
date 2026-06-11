@@ -59,7 +59,7 @@ const S = {
 
   p: `text-align: left; line-height: 26px; font-family: ${FONT}; margin: 0; padding-bottom: 1em; letter-spacing: 0.1em; white-space: pre-line; color: rgb(63,63,63); font-size: 15px;`,
 
-  strong: `word-break: break-all; font-weight: 600; color: #407600;`,
+  strong: `word-break: normal; overflow-wrap: break-word; font-weight: 600; color: #407600;`,
   em:     `font-style: italic;`,
   code_inline: `background: rgba(135,131,120,.15); border-radius: 4px; font-size: 85%; padding: 0.2em 0.4em; color: #222222; font-family: ${MONO};`,
   s: `text-decoration: line-through; color: #888888;`,
@@ -100,11 +100,11 @@ const S = {
 
   embed_wrapper: `margin: 1em 0; border: 1px solid rgba(0,0,0,.1); padding: 11px 15px;`,
   embed_label:   `font-size: 12px; color: #888888; margin-bottom: 4px;`,
-  embed_link:    `font-size: 13px; text-decoration: none; color: #222222; border-bottom: 1px solid #222222; word-break: break-all;`,
+  embed_link:    `font-size: 13px; text-decoration: none; color: #222222; border-bottom: 1px solid #222222; word-break: normal; overflow-wrap: break-word;`,
 
   footnotes_wrapper: `margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,.15);`,
   footnotes_title:   `font-size: 12px; font-weight: bold; color: #888888; margin-bottom: .6em; text-transform: uppercase; letter-spacing: 1px;`,
-  footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: break-all;`,
+  footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: normal; overflow-wrap: break-word;`,
   footnote_num:      `color: #222222; font-weight: bold; margin-right: 4px;`,
 };
 
@@ -185,7 +185,7 @@ function renderBlock(block, links, depth) {
       return renderToggle(block, links, depth);
 
     case 'bookmark':
-      return `<p style="${S.p}"><a href="${escAttr(block.url)}" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:break-all;">${escHtml(block.text || block.url)}</a><sup style="color:#222222;font-size:.7em;font-weight:bold;line-height:0;">[${block.linkIndex}]</sup></p>`;
+      return `<p style="${S.p}"><a href="${escAttr(block.url)}" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:normal;overflow-wrap:break-word;">${escHtml(block.text || block.url)}</a><sup style="color:#222222;font-size:.7em;font-weight:bold;line-height:0;">[${block.linkIndex}]</sup></p>`;
 
     case 'todo':
       if (block.checked) {
@@ -347,9 +347,9 @@ function pi(html) {
     .replace(/<a\s+href="([^"]*)"([^>]*)>([\s\S]*?)<\/a>/g, (_, href, attrs, text) => {
       // callout 内公众号跳转链接：不加下划线
       if (attrs.includes('data-wechat-callout')) {
-        return `<a href="${href}" style="text-decoration:none;color:#222222;word-break:break-all;">${text}</a>`;
+        return `<a href="${href}" style="text-decoration:none;color:#222222;word-break:normal;overflow-wrap:break-word;">${text}</a>`;
       }
-      return `<a href="${href}" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:break-all;">${text}</a>`;
+      return `<a href="${href}" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:normal;overflow-wrap:break-word;">${text}</a>`;
     })
     .replace(/<sup>\[(\d+)\]<\/sup>/g,
       `<sup style="font-size:.7em;color:#222222;font-weight:bold;line-height:0;vertical-align:super;">[$1]</sup>`);
