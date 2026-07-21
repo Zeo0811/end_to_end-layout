@@ -76,7 +76,7 @@ function normalizeUrl(url) {
 }
 
 function detectPlatform(url) {
-  if (/notion\.(so|site)/.test(url)) return 'notion';
+  if (/notion\.(so|site|com)/.test(url)) return 'notion';
   if (/feishu\.cn|larksuite\.com/.test(url)) return 'feishu';
   return null;
 }
@@ -200,9 +200,12 @@ async function crawl(url) {
   }
 
   const b = await ensureBrowser();
+  // UA 版本号跟随实际 Chromium 版本，避免硬编码版本过旧被 Notion 判定为
+  // "unsupported browser" 并重定向到 /unsupported-browser.html
+  const chromeVersion = b.version();
   const context = await b.newContext({
     viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`,
   });
   const page = await context.newPage();
 
