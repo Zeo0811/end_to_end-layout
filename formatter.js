@@ -7,6 +7,10 @@ const hljs = require('highlight.js');
 // ── 字体 ──
 const FONT = "Optima-Regular, Optima, PingFangSC-light, PingFangTC-light, 'PingFang SC', Cambria, Cochin, Georgia, Times, 'Times New Roman', serif";
 const MONO = 'Operator Mono, Consolas, Monaco, Menlo, monospace';
+// 微信公众号「默认」正文样式（取自 mp.weixin.qq.com 阅读页与编辑器默认字体 span 的实际取值）
+const WX_FONT = "mp-quote, 'PingFang SC', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', Arial, sans-serif";
+const WX_SIZE = '15px', WX_COLOR = 'rgb(51,51,51)', WX_LS = '0.034em', WX_LH = '1.6';
+const WX_P_LH = '1.6em', WX_GAP = '30px';  // 正文行高用 em、块间距 30px
 
 // ── 代码语法高亮色表 ──
 const CODE_THEME = {
@@ -48,57 +52,57 @@ const CODE_THEME = {
 
 // ── 样式 ──
 const S = {
-  wrapper: `font-family: ${FONT}; font-size: 15px; color: rgb(63,63,63); line-height: 1.75; letter-spacing: 0.1em; word-wrap: break-word;`,
+  wrapper: `font-family: ${WX_FONT}; font-size: ${WX_SIZE}; color: ${WX_COLOR}; line-height: ${WX_LH}; letter-spacing: ${WX_LS}; word-wrap: break-word;`,
 
-  h1: `display: block; line-height: 1.5; font-size: 24px; font-family: ${FONT}; font-weight: bold; margin: 80px auto 40px auto; max-width: 100%; width: fit-content; color: #407600; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #407600; word-break: normal; overflow-wrap: normal;`,
-  h2: `display: block; line-height: 1.5; font-family: ${FONT}; font-size: 20px; font-weight: bold; margin: 40px auto; max-width: 100%; width: fit-content; color: #222222; text-align: center; padding: 0 0.2em; word-break: normal; overflow-wrap: normal;`,
-  h3: `display: block; line-height: 1.5; font-family: ${FONT}; font-size: 17px; font-weight: bold; margin: 40px 0; width: fit-content; color: #222222; text-align: left;`,
-  h4: `display: block; line-height: 1.5; font-family: ${FONT}; font-size: 16px; font-weight: bold; margin: 1em 0 .5em; color: #222222;`,
-  h5: `display: block; line-height: 1.5; font-family: ${FONT}; font-size: 15px; font-weight: bold; margin: .8em 0 .4em; color: #222222;`,
-  h6: `display: block; line-height: 1.5; font-family: ${FONT}; font-size: 14px; font-weight: bold; margin: .7em 0 .35em; color: #555555;`,
+  h1: `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 80px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
+  h2: `display: block; line-height: 1.5; font-family: ${WX_FONT}; font-size: 20px; font-weight: bold; margin: 40px auto; max-width: 100%; width: fit-content; color: #222222; text-align: center; padding: 0 0.2em; word-break: normal; overflow-wrap: normal;`,
+  h3: `display: block; line-height: 1.5; font-family: ${WX_FONT}; font-size: 17px; font-weight: bold; margin: 40px 0; width: fit-content; color: #222222; text-align: left;`,
+  h4: `display: block; line-height: 1.5; font-family: ${WX_FONT}; font-size: 16px; font-weight: bold; margin: 1em 0 .5em; color: #222222;`,
+  h5: `display: block; line-height: 1.5; font-family: ${WX_FONT}; font-size: 15px; font-weight: bold; margin: .8em 0 .4em; color: #222222;`,
+  h6: `display: block; line-height: 1.5; font-family: ${WX_FONT}; font-size: 14px; font-weight: bold; margin: .7em 0 .35em; color: #555555;`,
 
-  p: `text-align: left; line-height: 26px; font-family: ${FONT}; margin: 0; padding-bottom: 1em; letter-spacing: 0.1em; white-space: pre-line; color: rgb(63,63,63); font-size: 15px;`,
+  p: `text-align: left; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; margin: 0; padding-bottom: ${WX_GAP}; letter-spacing: ${WX_LS}; white-space: pre-line; color: ${WX_COLOR}; font-size: ${WX_SIZE};`,
 
-  strong: `word-break: normal; overflow-wrap: break-word; font-weight: 600; color: #407600;`,
+  strong: `word-break: normal; overflow-wrap: break-word; font-weight: 600; color: #327848;`,
   em:     `font-style: italic;`,
   code_inline: `background: rgba(135,131,120,.15); border-radius: 4px; font-size: 85%; padding: 0.2em 0.4em; color: #222222; font-family: ${MONO};`,
   s: `text-decoration: line-through; color: #888888;`,
 
-  blockquote_wrapper: `line-height: 26px; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 20px 0; border-left: 3px solid #407600; background-color: #f5f5f5; font-family: ${FONT}; letter-spacing: 0.1em; color: #407600; font-size: 15px;`,
+  blockquote_wrapper: `line-height: 26px; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 0 0 30px; border-left: 2px solid #327848; background-color: #f5f5f5; font-family: ${WX_FONT}; letter-spacing: 0.1em; color: #327848; font-size: 15px;`,
 
-  callout_wrapper: `font-size: 15px; white-space: normal; margin: 20px 0; color: #3f3f3f; font-family: ${FONT}; line-height: 26px; letter-spacing: 0.1em; background-color: #f9fdf5; border: 1px solid #407600; border-radius: 8px; padding: 16px 20px;`,
+  callout_wrapper: `font-size: 15px; white-space: normal; margin: 0 0 30px; color: #3f3f3f; font-family: ${WX_FONT}; line-height: 26px; letter-spacing: 0.1em; background-color: #f9fdf5; border: 1px solid #327848; padding: 16px 20px;`,
   callout_content: ``,
 
-  code_wrapper:  `margin: 20px 10px; display: block; width: calc(100% - 20px); box-sizing: border-box; font-size: 15px; padding: 10px; color: #333; position: relative; background-color: #fafafa; border: 1px solid #f0f0f0; border-radius: 5px; white-space: pre; box-shadow: rgba(0,0,0,.3) 0px 2px 10px; overflow-x: auto; text-align: left; font-family: ${MONO};`,
+  code_wrapper:  `margin: 0 10px 30px; display: block; width: calc(100% - 20px); box-sizing: border-box; font-size: 15px; padding: 10px; color: #333; position: relative; background-color: #fafafa; border: 1px solid #f0f0f0; border-radius: 5px; white-space: pre; box-shadow: rgba(0,0,0,.3) 0px 2px 10px; overflow-x: auto; text-align: left; font-family: ${MONO};`,
   code_lang_bar: `font-size: 11px; color: #999; font-family: ${MONO}; padding-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid #f0f0f0; margin-bottom: 8px;`,
   code_pre:      `margin: 0; padding: 0; overflow-x: auto; background: transparent;`,
   code_text:     `font-family: ${MONO}; font-size: 14px; line-height: 1.65; white-space: pre; word-break: normal; display: block; color: #333;`,
 
-  hr: `border-style: solid; border-width: 1px 0 0; border-color: #797979; margin: 15px 0;`,
+  hr: `border-style: solid; border-width: 1px 0 0; border-color: #797979; margin: 0 0 30px;`,
 
-  ul: `padding-left: 1.5em; font-size: 15px; line-height: 1.75; font-family: ${FONT}; vertical-align: baseline; white-space: normal; color: rgb(63,63,63); margin-bottom: 8px; margin-top: 0;`,
-  ol: `padding-left: 1.5em; font-size: 15px; line-height: 26px; font-family: ${FONT}; vertical-align: baseline; white-space: normal; color: rgb(63,63,63); margin-bottom: 8px; margin-top: 0;`,
-  li_ul: `font-size: 15px; line-height: 26px; font-family: ${FONT}; list-style-position: outside; list-style-type: disc;`,
-  li_ol: `font-size: 15px; line-height: 1.75; font-family: ${FONT}; list-style-position: outside; list-style-type: decimal;`,
+  ul: `padding-left: 1.5em; font-size: 15px; line-height: 1.75; font-family: ${WX_FONT}; vertical-align: baseline; white-space: normal; color: rgb(51,51,51); margin-bottom: 30px; margin-top: 0;`,
+  ol: `padding-left: 1.5em; font-size: 15px; line-height: 26px; font-family: ${WX_FONT}; vertical-align: baseline; white-space: normal; color: rgb(51,51,51); margin-bottom: 30px; margin-top: 0;`,
+  li_ul: `font-size: 15px; line-height: 26px; font-family: ${WX_FONT}; list-style-position: outside; list-style-type: disc;`,
+  li_ol: `font-size: 15px; line-height: 1.75; font-family: ${WX_FONT}; list-style-position: outside; list-style-type: decimal;`,
   li_p:  `font-family: inherit; vertical-align: baseline; margin: 10px 0;`,
 
-  img_wrapper: `margin: 15px 0; text-align: center;`,
-  img:         `max-width: 100%; height: auto; border-radius: 10px; display: inline-block;`,
+  img_wrapper: `margin: 0 0 30px; text-align: center;`,
+  img:         `max-width: 100%; height: auto; display: inline-block;`,
   img_caption: `font-size: 12px; color: #888888; margin-top: 5px; text-align: center;`,
 
-  video_wrapper: `margin: 1em 0; background: #111; border-radius: 8px; padding: 28px 20px; text-align: center;`,
+  video_wrapper: `margin: 0 0 30px; background: #111; border-radius: 8px; padding: 28px 20px; text-align: center;`,
   video_label:   `color: rgba(255,255,255,.45); font-size: 14px;`,
 
-  toggle_summary: `display:block;font-size:15px;font-weight:bold;color:#222222;margin:12px 0 5px;padding-left:15px;border-left:3px solid #222222;font-family:${FONT};`,
+  toggle_summary: `display:block;font-size:15px;font-weight:bold;color:#222222;margin:12px 0 5px;padding-left:15px;border-left:3px solid #222222;font-family:${WX_FONT};`,
   toggle_content: `display:block;padding-left:15px;border-left:2px solid rgba(0,0,0,.15);margin-left:4px;`,
 
-  table_wrapper: `overflow-x: auto; margin: 1em 0;`,
-  table:         `border-collapse: collapse; width: 100%; font-size: 15px; line-height: 1.6; font-family: ${FONT};`,
+  table_wrapper: `overflow-x: auto; margin: 0 0 30px;`,
+  table:         `border-collapse: collapse; width: 100%; font-size: 15px; line-height: 1.6; font-family: ${WX_FONT};`,
   th:            `background: rgba(0,0,0,.05); padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); font-weight: bold; text-align: left; color: #222222;`,
   td:            `padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); color: #222222;`,
   td_even:       `padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); color: #222222; background: rgba(0,0,0,.02);`,
 
-  embed_wrapper: `margin: 1em 0; border: 1px solid rgba(0,0,0,.1); padding: 11px 15px;`,
+  embed_wrapper: `margin: 0 0 30px; border: 1px solid rgba(0,0,0,.1); padding: 11px 15px;`,
   embed_label:   `font-size: 12px; color: #888888; margin-bottom: 4px;`,
   embed_link:    `font-size: 13px; text-decoration: none; color: #222222; border-bottom: 1px solid #222222; word-break: normal; overflow-wrap: break-word;`,
 
@@ -149,7 +153,8 @@ function renderBlock(block, links, depth) {
 
     case 'paragraph': {
       const text = (block.content || '').replace(/\u200b/g, '').trim();
-      if (!text) return '<br>';
+      // 空行直接丢弃：段间距一律由 p 的 padding-bottom(30px) 决定
+      if (!text) return '';
       return applyS('p', pi(block.content), 'p');
     }
 
@@ -261,7 +266,7 @@ function renderList(items, isOrdered, depth) {
   const indent = depth > 0 ? `padding-left: ${depth * 1.5}em;` : '';
   const baseStyle = `text-align: left; line-height: 26px; font-family: ${FONT}; margin: 5px 0; letter-spacing: 0.1em; color: rgb(63,63,63); font-size: 15px; ${indent}`;
   const markerStyle = `display: inline-block; min-width: 1.5em; margin-right: 0.3em;`;
-  const boldMarkerStyle = `${markerStyle} font-weight: 600; color: #407600;`;
+  const boldMarkerStyle = `${markerStyle} font-weight: 600; color: #327848;`;
 
   let html = '';
   items.forEach((item, index) => {
