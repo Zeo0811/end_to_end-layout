@@ -1469,8 +1469,9 @@ function formatToWechat(parsedData, options = {}) {
 // 图片用 data URI，publishArticle 的 processHtmlImages 会自动上传到微信并换成 mmbiz 地址。
 function buildRecommendBlock(cards) {
   if (!Array.isArray(cards) || cards.length === 0) return '';
+  // alt 是正文内容，用 escHtml（转义 & < > "）；href/src 是 URL，escAttr 转引号就够
   const items = cards.map(c =>
-    `<a href="${escAttr(c.url)}"><img src="${escAttr(c.dataUri)}" alt="${escAttr(c.title)}" style="${S.recommend_img}"></a>`
+    `<a href="${escAttr(c.url)}"><img src="${escAttr(c.dataUri)}" alt="${escHtml(c.title)}" style="${S.recommend_img}"></a>`
   ).join('');
   return `<section style="${S.recommend_wrapper}"><section style="${S.recommend_title}">推荐阅读</section>${items}</section>`;
 }
