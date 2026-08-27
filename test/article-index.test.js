@@ -298,3 +298,71 @@ test('syncAccount: 非权限类错误照常抛出，不误降级', async () => {
   };
   await assert.rejects(() => idx.syncAccount('凭证错号', fakeClient), /40001/);
 });
+
+test('getIndexStats: usable 只数「已发布 + 有链接 + 有封面」的', () => {
+  const acc = '可用性号';
+  db.upsertArticle({ accountName: acc, title: '齐全', url: 'https://mp/ok', thumbUrl: 'https://img/a.jpg', status: 'published' });
+  db.upsertArticle({ accountName: acc, title: '缺封面', url: 'https://mp/nocover', thumbUrl: '', status: 'published' });
+  db.upsertArticle({ accountName: acc, title: '缺链接', url: '', mediaId: 'm-nolink', thumbUrl: 'https://img/b.jpg', status: 'published' });
+  const s = db.getIndexStats(acc);
+  assert.strictEqual(s.published, 3);
+  assert.strictEqual(s.usable, 1, '只有三者齐全的那篇能进推荐池');
+});
+
+test('syncAccount: total_count 缺失时仍能翻完所有页（曾卡在正好 20 篇）', async () => {
+  const acc = '翻页回归号';
+  const all = Array.from({ length: 47 }, (_, i) => ({
+    media_id: `m-${i}`, update_time: 1756000000 + i,
+    content: { news_item: [{
+      title: `翻页文 ${i}`, digest: '', content: `<p>讲 Gadget${i}</p>`,
+      url: `https://mp.weixin.qq.com/s/pg-${i}`,
+    }] },
+  }));
+  // 关键：服务端不返回 total_count。旧实现会退化成「本页数量」，第一页就 break。
+  const fakeClient = {
+    async getFreePublishList() { throw new Error('[48001] api unauthorized'); },
+    async getMaterialNewsList(offset, count) {
+      return { item: all.slice(offset, offset + count) };
+    },
+  };
+  const r = await idx.syncAccount(acc, fakeClient);
+  assert.strictEqual(r.total, 47, `应取满 47 篇，实际 ${r.total}`);
+  assert.strictEqual(r.pages, 3, '20 + 20 + 7 共三页');
+  assert.strictEqual(db.listPublishedArticles(acc).length, 47);
+});
+
+test('syncAccount: total_count 为 0 时也不提前终止', async () => {
+  const acc = '零总数号';
+  const all = Array.from({ length: 25 }, (_, i) => ({
+    media_id: `z-${i}`, update_time: 1756000000 + i,
+    content: { news_item: [{ title: `零总数文 ${i}`, digest: '', content: '<p>x</p>', url: `https://mp.weixin.qq.com/s/z-${i}` }] },
+  }));
+  const fakeClient = {
+    async getFreePublishList() { throw new Error('[48001] api unauthorized'); },
+    async getMaterialNewsList(offset, count) {
+      return { item: all.slice(offset, offset + count), total_count: 0 };
+    },
+  };
+  const r = await idx.syncAccount(acc, fakeClient);
+  assert.strictEqual(r.total, 25);
+});
+
+test('syncAccount: 多图文里的每一篇都入库，不只头条', async () => {
+  const acc = '多图文号';
+  const one = [{
+    media_id: 'multi-1', update_time: 1756000000,
+    content: { news_item: [
+      { title: '头条：聊聊 Cursor',  digest: '', content: '<p>头条正文</p>', url: 'https://mp.weixin.qq.com/s/mt-1' },
+      { title: '次条：聊聊 Manus',  digest: '', content: '<p>次条正文</p>', url: 'https://mp.weixin.qq.com/s/mt-2' },
+      { title: '三条：聊聊 Devin',  digest: '', content: '<p>三条正文</p>', url: 'https://mp.weixin.qq.com/s/mt-3' },
+    ] },
+  }];
+  const fakeClient = {
+    async getFreePublishList() { throw new Error('[48001] api unauthorized'); },
+    async getMaterialNewsList(offset, count) { return { item: one.slice(offset, offset + count) }; },
+  };
+  const r = await idx.syncAccount(acc, fakeClient);
+  assert.strictEqual(r.total, 3, '一条多图文素材应产出 3 篇文章');
+  const titles = db.listPublishedArticles(acc).map(x => x.title).sort();
+  assert.deepStrictEqual(titles, ['三条：聊聊 Devin', '头条：聊聊 Cursor', '次条：聊聊 Manus'].sort());
+});

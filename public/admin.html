@@ -308,8 +308,10 @@
       try {
         const s = await api('/api/index-stats?accountName=' + encodeURIComponent(name));
         const last = s.lastSyncedAt ? new Date(s.lastSyncedAt).toLocaleString('zh-CN') : '从未同步';
+        const short = s.published - (s.usable || 0);
+        const warn  = short > 0 ? ` · ⚠️ ${short} 篇没抓到封面，不会出现在推荐里` : '';
         document.getElementById('indexStats').textContent =
-          `已发布 ${s.published} 篇 · 待回填 ${s.pending} 篇 · 上次同步：${last}`;
+          `已发布 ${s.published} 篇（可推荐 ${s.usable || 0} 篇）· 待回填 ${s.pending} 篇 · 上次同步：${last}${warn}`;
       } catch (e) {
         document.getElementById('indexStats').textContent = '读取失败: ' + e.message;
       }

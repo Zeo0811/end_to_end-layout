@@ -321,13 +321,18 @@ function getIndexStats(accountName) {
     SELECT
       COUNT(*) AS total,
       SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
-      SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending
+      SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending,
+      -- 能进推荐池的：已发布 + 有链接 + 有封面。缺封面的合不出卡片会被静默跳过，
+      -- 所以这个数才是真正可用的候选量。
+      SUM(CASE WHEN status = 'published' AND url IS NOT NULL AND url != ''
+                AND thumb_url IS NOT NULL AND thumb_url != '' THEN 1 ELSE 0 END) AS usable
     FROM articles WHERE account_name = ?
   `).get(accountName);
   return {
     total: row.total || 0,
     published: row.published || 0,
     pending: row.pending || 0,
+    usable: row.usable || 0,
     lastSyncedAt: getSyncMeta(accountName),
   };
 }
