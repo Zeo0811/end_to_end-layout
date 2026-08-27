@@ -117,3 +117,134 @@ test('setSyncMeta / getSyncMeta: 记录上次同步时间', () => {
   db.setSyncMeta('新号', '2026-08-26T10:00:00Z');
   assert.strictEqual(db.getSyncMeta('新号'), '2026-08-26T10:00:00Z');
 });
+
+// ── Task 3: 同步与回填 ──
+
+const idx = require('../article-index');
+
+test('htmlToText: 去标签、合并空白', () => {
+  const t = idx.htmlToText('<p>你好</p><p>世界</p><script>var a=1</script>');
+  assert.ok(t.includes('你好'));
+  assert.ok(t.includes('世界'));
+  assert.ok(!t.includes('var a=1'), 'script 内容应被剥掉');
+  assert.ok(!t.includes('<'), '不应残留标签');
+});
+
+test('pickThumbUrl: 优先用 thumb_url', () => {
+  assert.strictEqual(idx.pickThumbUrl({ thumb_url: 'https://img/a.jpg', content: '' }), 'https://img/a.jpg');
+});
+
+test('pickThumbUrl: 没有 thumb_url 时从正文抠第一张图', () => {
+  const item = { thumb_url: '', content: '<p>x</p><img src="https://img/first.jpg"><img src="https://img/second.jpg">' };
+  assert.strictEqual(idx.pickThumbUrl(item), 'https://img/first.jpg');
+});
+
+test('pickThumbUrl: 都没有时返回空串', () => {
+  assert.strictEqual(idx.pickThumbUrl({ thumb_url: '', content: '<p>无图</p>' }), '');
+});
+
+test('makeSummary: 截到 800 字以内且包含标题', () => {
+  const s = idx.makeSummary('标题', '正文'.repeat(1000));
+  assert.ok(s.startsWith('标题'));
+  assert.ok(s.length <= 810, `实际长度 ${s.length}`);
+});
+
+test('parsedToText: 拼接文本类 block 的 content', () => {
+  const parsed = { title: 'T', blocks: [
+    { type: 'h1', content: '大标题' },
+    { type: 'paragraph', content: '一段话' },
+    { type: 'image', url: 'https://x/a.png' },
+    { type: 'paragraph', content: '又一段' },
+  ] };
+  const t = idx.parsedToText(parsed);
+  assert.ok(t.includes('大标题') && t.includes('一段话') && t.includes('又一段'));
+  assert.ok(!t.includes('https://x/a.png'), '图片 URL 不应进正文');
+});
+
+test('indexFromParsed: 写入 pending 并存好实体', () => {
+  const id = idx.indexFromParsed({
+    accountName: '同步号', title: 'Cursor 深度实测', mediaId: 'media-abc',
+    sourceUrl: 'https://notion.so/x',
+    parsed: { title: 'Cursor 深度实测', blocks: [{ type: 'paragraph', content: '我们把 Cursor 用了一个月' }] },
+  });
+  assert.ok(id > 0);
+  assert.strictEqual(db.getArticleEntities(id).cursor, 3);
+  assert.ok(db.findPendingByTitle('同步号', 'Cursor 深度实测'));
+});
+
+test('indexFromWechatItem: 命中 pending 时回填 url 并转 published', () => {
+  const acc = '回填号2';
+  // parsed 里有 Devin，微信那份 HTML 里没有。回填后 Devin 还在，
+  // 才能证明保留的是 crawler 抽的实体，而不是从微信 HTML 重抽了一遍。
+  const pendingId = idx.indexFromParsed({
+    accountName: acc, title: '回填测试文', mediaId: 'media-back',
+    sourceUrl: 'https://notion.so/back',
+    parsed: { title: '回填测试文', blocks: [
+      { type: 'paragraph', content: 'Manus 很有意思' },
+      { type: 'paragraph', content: '顺便也试了 Devin' },
+    ] },
+  });
+  assert.strictEqual(db.getArticleEntities(pendingId).devin, 1, '前置条件：Devin 已被 crawler 抽到');
+
+  const sameId = idx.indexFromWechatItem(acc, {
+    title: '回填测试文', digest: '摘要', content: '<p>Manus 很有意思</p>',
+    url: 'https://mp.weixin.qq.com/s/back', thumb_url: 'https://img/back.jpg',
+  }, 'art-1', 1756000000);
+
+  assert.strictEqual(sameId, pendingId, '应更新同一行而不是新插入');
+  const row = db.listPublishedArticles(acc).find(r => r.id === pendingId);
+  assert.ok(row, 'pending 应已转为 published');
+  assert.strictEqual(row.url, 'https://mp.weixin.qq.com/s/back');
+  assert.strictEqual(row.thumbUrl, 'https://img/back.jpg');
+  // Manus 在正文首段，权重 2（标题 3 / 首段 2 / 其余 1）
+  assert.strictEqual(db.getArticleEntities(pendingId).manus, 2);
+  // 关键：微信那份 content 里没有 Devin，它还在就说明实体没被重抽覆盖
+  assert.strictEqual(db.getArticleEntities(pendingId).devin, 1, 'crawler 抽出的实体必须保留');
+});
+
+test('indexFromWechatItem: 没有 pending 时作为新文章插入', () => {
+  const acc = '直发号';
+  const id = idx.indexFromWechatItem(acc, {
+    title: '后台直接写的文章', digest: '', content: '<p>聊聊 Sora 的进展</p>',
+    url: 'https://mp.weixin.qq.com/s/direct', thumb_url: 'https://img/d.jpg',
+  }, 'art-2', 1756000000);
+  assert.ok(id > 0);
+  // Sora 在反解出的正文首段，权重 2
+  assert.strictEqual(db.getArticleEntities(id).sora, 2);
+});
+
+test('syncAccount: 分页拉取并全部入库', async () => {
+  const acc = '分页号';
+  // 造 25 条，验证翻页（每页 20）
+  const all = Array.from({ length: 25 }, (_, i) => ({
+    article_id: `a-${i}`, update_time: 1756000000 + i,
+    content: { news_item: [{
+      title: `分页文章 ${i}`, digest: '', content: `<p>讲 Widget${i} 这个产品</p>`,
+      url: `https://mp.weixin.qq.com/s/page-${i}`, thumb_url: `https://img/${i}.jpg`,
+    }] },
+  }));
+
+  const fakeClient = {
+    async getFreePublishList(offset, count) {
+      return { item: all.slice(offset, offset + count), total_count: all.length, item_count: Math.min(count, all.length - offset) };
+    },
+  };
+
+  const result = await idx.syncAccount(acc, fakeClient);
+  assert.strictEqual(result.total, 25);
+  assert.strictEqual(db.listPublishedArticles(acc).length, 25);
+  assert.ok(db.getSyncMeta(acc), '应记录同步时间');
+});
+
+test('syncAccount: 重复同步不产生重复行', async () => {
+  const acc = '幂等号';
+  const one = [{
+    article_id: 'a-1', update_time: 1756000000,
+    content: { news_item: [{ title: '唯一文章', digest: '', content: '<p>x</p>', url: 'https://mp.weixin.qq.com/s/only', thumb_url: '' }] },
+  }];
+  const fakeClient = { async getFreePublishList(offset, count) { return { item: one.slice(offset, offset + count), total_count: 1, item_count: offset === 0 ? 1 : 0 }; } };
+
+  await idx.syncAccount(acc, fakeClient);
+  await idx.syncAccount(acc, fakeClient);
+  assert.strictEqual(db.listPublishedArticles(acc).length, 1);
+});
