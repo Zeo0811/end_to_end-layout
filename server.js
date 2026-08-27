@@ -4,8 +4,11 @@ const crypto  = require('crypto');
 const path    = require('path');
 const db      = require('./db');
 const crawler = require('./parsers/crawler');
-const { formatToWechat } = require('./formatter');
+const { formatToWechat, buildRecommendBlock } = require('./formatter');
 const { createClient }   = require('./wechat-api');
+const { recommend, extractEntities } = require('./recommender');
+const articleIndex = require('./article-index');
+const { renderCards } = require('./card-renderer');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -45,6 +48,37 @@ function getWechatClient(accountName) {
   clientCache.set(accountName, client);
   return client;
 }
+
+// ── prepare 缓存 ──
+// 存 crawl 出来的 parsed，让 publish 阶段不必重爬。
+// TTL 短是因为 Notion 图片是签名 URL，约 1 小时过期。
+const prepares = new Map();
+const PREPARE_TTL = 15 * 60 * 1000;
+const PREPARE_MAX = 20;
+
+function putPrepare(data) {
+  // 超出上限时淘汰最老的一条
+  while (prepares.size >= PREPARE_MAX) {
+    const oldest = [...prepares.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+    if (!oldest) break;
+    prepares.delete(oldest[0]);
+  }
+  const id = crypto.randomBytes(16).toString('hex');
+  prepares.set(id, { ...data, createdAt: Date.now() });
+  return id;
+}
+
+function takePrepare(id) {
+  const p = prepares.get(id);
+  if (!p) return null;
+  if (Date.now() - p.createdAt > PREPARE_TTL) { prepares.delete(id); return null; }
+  return p;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, p] of prepares) if (now - p.createdAt > PREPARE_TTL) prepares.delete(id);
+}, 5 * 60 * 1000);
 
 // ── 中间件 ──
 
@@ -154,63 +188,157 @@ app.delete('/api/accounts/:name', auth, adminOnly, (req, res) => {
 
 // ── 发布 ──
 
-app.post('/api/publish', auth, async (req, res) => {
-  let { url, accountName, author, digest } = req.body;
-  const operator = req.user.username;
+// ── 发布第一段：爬取 + 排版 + 算候选 ──
 
-  if (!url) return res.status(400).json({ error: '缺少链接' });
-  // 兼容 Notion 分享的路径片段（如 /3258e8f5...?source=copy_link）
-  if (/^\/[0-9a-f]{32}/.test(url.trim())) url = 'https://www.notion.so' + url.trim();
-  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
-
-  // SSE 实时进度
+function openSSE(res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  return {
+    progress(step, percent, msg) {
+      res.write(`data: ${JSON.stringify({ type: 'progress', step, percent, msg })}\n\n`);
+    },
+    done(payload) {
+      res.write(`data: ${JSON.stringify({ type: 'done', ...payload })}\n\n`);
+      res.end();
+    },
+  };
+}
 
-  function sendProgress(step, percent, msg) {
-    res.write(`data: ${JSON.stringify({ type: 'progress', step, percent, msg })}\n\n`);
+// 把技术性错误翻译为用户能理解的提示
+function translatePublishError(msg) {
+  if (/Target crashed|target closed|Target closed/i.test(msg)) {
+    return '页面内容过大或服务器内存不足，浏览器进程崩溃。建议：1) 检查页面是否已公开 2) 减少文章中的图片数量 3) 稍后重试';
+  }
+  if (/timeout|超时/i.test(msg))  return '页面加载超时，请检查链接是否可正常访问';
+  if (/net::ERR_/i.test(msg))     return '无法访问该链接，请检查网络或链接是否正确';
+  return msg;
+}
+
+function normalizeNotionUrl(url) {
+  const u = (url || '').trim();
+  return /^\/[0-9a-f]{32}/.test(u) ? 'https://www.notion.so' + u : u;
+}
+
+app.post('/api/prepare', auth, async (req, res) => {
+  const url = normalizeNotionUrl(req.body.url);
+  const { accountName } = req.body;
+  if (!url)         return res.status(400).json({ error: '缺少链接' });
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+
+  const sse = openSSE(res);
+  try {
+    // 索引超过 1 小时没同步就后台补一次，不 await，不拖慢本次准备。
+    // 本次用的还是旧索引，下次就是新的。
+    const last = db.getSyncMeta(accountName);
+    if (!last || Date.now() - new Date(last).getTime() > 60 * 60 * 1000) {
+      safeSync(accountName, '发布页触发').catch(() => {});
+    }
+
+    sse.progress(1, 15, '正在打开页面...');
+    const parsed = await crawler.crawl(url);
+    const title  = parsed.title || '未命名文章';
+    sse.progress(2, 55, `已解析「${title}」${parsed.blocks?.length || 0} 个内容块`);
+
+    sse.progress(3, 75, '正在查找相关的历史文章...');
+    const bodyText = articleIndex.parsedToText(parsed);
+    const current = {
+      entities:    extractEntities(title, bodyText),
+      summaryText: articleIndex.makeSummary(title, bodyText),
+      url:         '',
+      sourceUrl:   url,
+    };
+    const { docFreq, totalDocs } = db.getEntityDocFreq(accountName);
+    const candidates = recommend({
+      current,
+      candidates: db.listPublishedArticles(accountName),
+      docFreq, totalDocs, limit: 8,
+    });
+
+    const prepareId = putPrepare({ parsed, title, url, accountName });
+    sse.progress(4, 100, candidates.length ? `找到 ${candidates.length} 篇相关文章` : '没有找到相关文章');
+    sse.done({ ok: true, prepareId, title, candidates });
+  } catch (e) {
+    console.error('[Prepare] 失败:', e.message);
+    sse.done({ ok: false, error: translatePublishError(e.message) });
+  }
+});
+
+// ── 发布第二段：合图 + 追加 + 上传 + 建草稿 ──
+
+app.post('/api/publish', auth, async (req, res) => {
+  let { url, accountName, author, digest, prepareId, selectedIds } = req.body;
+  const operator = req.user.username;
+  url = normalizeNotionUrl(url);
+
+  const cached = prepareId ? takePrepare(prepareId) : null;
+  if (prepareId && !cached) {
+    return res.status(410).json({ error: '本次准备结果已过期，请重新开始' });
+  }
+  if (cached) {
+    url         = cached.url;
+    accountName = cached.accountName;
   }
 
+  if (!url)         return res.status(400).json({ error: '缺少链接' });
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+
+  const sse = openSSE(res);
   let title = '';
   try {
-    sendProgress(1, 10, '正在打开页面...');
-    const parsed = await crawler.crawl(url);
-    title = parsed.title || '未命名文章';
-    sendProgress(2, 35, `已解析「${title}」${parsed.blocks?.length || 0} 个内容块`);
+    let parsed;
+    if (cached) {
+      parsed = cached.parsed;
+      title  = cached.title;
+      sse.progress(1, 30, `复用已解析的「${title}」`);
+    } else {
+      sse.progress(1, 10, '正在打开页面...');
+      parsed = await crawler.crawl(url);
+      title  = parsed.title || '未命名文章';
+      sse.progress(2, 35, `已解析「${title}」${parsed.blocks?.length || 0} 个内容块`);
+    }
 
-    sendProgress(3, 45, '正在排版格式化...');
-    const html = formatToWechat(parsed);
-    sendProgress(3, 55, '排版完成，开始上传...');
+    // 合成推荐卡片。任何一步失败都不阻断发布，最多是没有推荐板块。
+    let appendHtml = '';
+    const ids = Array.isArray(selectedIds) ? selectedIds : [];
+    if (ids.length > 0) {
+      sse.progress(3, 45, `正在合成 ${ids.length} 张推荐卡片...`);
+      try {
+        const pool   = db.listPublishedArticles(accountName);
+        const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
+        const cards  = await renderCards(chosen.map(a => ({ title: a.title, url: a.url, coverUrl: a.thumbUrl })));
+        appendHtml = buildRecommendBlock(cards);
+        if (cards.length < chosen.length) {
+          sse.progress(3, 50, `${chosen.length - cards.length} 篇因封面取不到被跳过`);
+        }
+      } catch (e) {
+        console.error('[Publish] 推荐卡片合成失败，跳过该板块:', e.message);
+        sse.progress(3, 50, '推荐卡片合成失败，已跳过');
+      }
+    }
+
+    sse.progress(4, 55, '正在排版格式化...');
+    const html = formatToWechat(parsed, { appendHtml });
 
     const client = getWechatClient(accountName);
-    sendProgress(4, 60, '正在上传图片到微信...');
+    sse.progress(5, 65, '正在上传图片到微信...');
 
-    const result = await client.publishArticle({
-      title,
-      author: author || '',
-      html,
-      digest: digest || '',
-    });
-    sendProgress(5, 100, '发布成功！');
+    const result = await client.publishArticle({ title, author: author || '', html, digest: digest || '' });
+    sse.progress(6, 100, '发布成功！');
+
+    // 写入文章库（pending，等群发后由同步任务回填 url）
+    try {
+      articleIndex.indexFromParsed({ accountName, title, mediaId: result.media_id, sourceUrl: url, parsed });
+    } catch (e) {
+      console.error('[Publish] 写入文章库失败（不影响发布）:', e.message);
+    }
 
     db.addLog({ operator, url, title, accountName, mediaId: result.media_id, status: 'success', errorMsg: '' });
-    res.write(`data: ${JSON.stringify({ type: 'done', ok: true, title, media_id: result.media_id })}\n\n`);
-    res.end();
+    sse.done({ ok: true, title, media_id: result.media_id });
   } catch (e) {
     console.error('[Publish] 失败:', e.message);
-    // 把技术性错误翻译为用户能理解的提示
-    let userError = e.message;
-    if (/Target crashed|target closed|Target closed/i.test(e.message)) {
-      userError = '页面内容过大或服务器内存不足，浏览器进程崩溃。建议：1) 检查页面是否已公开 2) 减少文章中的图片数量 3) 稍后重试';
-    } else if (/timeout|超时/i.test(e.message)) {
-      userError = '页面加载超时，请检查链接是否可正常访问';
-    } else if (/net::ERR_/i.test(e.message)) {
-      userError = '无法访问该链接，请检查网络或链接是否正确';
-    }
     db.addLog({ operator, url, title, accountName, mediaId: '', status: 'error', errorMsg: e.message });
-    res.write(`data: ${JSON.stringify({ type: 'done', ok: false, error: userError, title })}\n\n`);
-    res.end();
+    sse.done({ ok: false, error: translatePublishError(e.message), title });
   }
 });
 
@@ -233,6 +361,27 @@ app.post('/api/delete-draft', auth, async (req, res) => {
 
 // ── 日志 ──
 
+// ── 文章库 ──
+
+app.post('/api/sync-articles', auth, async (req, res) => {
+  const { accountName } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  try {
+    const client = getWechatClient(accountName);
+    const result = await articleIndex.syncAccount(accountName, client);
+    res.json({ ok: true, ...result, stats: db.getIndexStats(accountName) });
+  } catch (e) {
+    console.error('[Sync] 失败:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/index-stats', auth, (req, res) => {
+  const accountName = req.query.accountName;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  res.json(db.getIndexStats(accountName));
+});
+
 app.get('/api/logs', auth, (req, res) => {
   const page     = parseInt(req.query.page) || 1;
   const pageSize = parseInt(req.query.pageSize) || 20;
@@ -241,10 +390,32 @@ app.get('/api/logs', auth, (req, res) => {
 
 // ── 启动 ──
 
+// 同步一个账号，失败只记日志不抛，避免打挂启动流程
+async function safeSync(accountName, reason) {
+  try {
+    const client = getWechatClient(accountName);
+    await articleIndex.syncAccount(accountName, client);
+  } catch (e) {
+    console.error(`[Sync] ${accountName} ${reason} 同步失败:`, e.message);
+  }
+}
+
+async function syncAllAccounts(reason, onlyIfEmpty = false) {
+  for (const acc of db.getAccounts()) {
+    if (onlyIfEmpty && db.getIndexStats(acc.name).published > 0) continue;
+    await safeSync(acc.name, reason);
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Accounts: ${db.getAccounts().length} 个公众号已配置`);
+  // 索引为空时全量重建。Railway 若未挂 Volume，这一步会自动补回文章库。
+  syncAllAccounts('启动', true);
 });
+
+// 每 6 小时增量同步
+setInterval(() => syncAllAccounts('定时'), 6 * 60 * 60 * 1000);
 
 process.on('SIGTERM', async () => {
   await crawler.closeBrowser();
