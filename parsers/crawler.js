@@ -478,4 +478,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { crawl, closeBrowser };
+module.exports = { crawl, closeBrowser, ensureBrowser };
