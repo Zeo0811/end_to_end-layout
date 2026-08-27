@@ -364,10 +364,24 @@ function createClient(appId, appSecret) {
     });
   }
 
+  // 各类永久素材的数量。用来判断素材库里到底有多少图文，
+  // 区分「接口只翻到一页」和「素材库本来就这么少」。
+  async function getMaterialCount() {
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/material/get_materialcount?access_token=${token}`;
+      const res   = await fetch(url);
+      const data  = await res.json();
+      if (data.errcode) throw new Error(`获取素材数量失败: [${data.errcode}] ${data.errmsg}`);
+      return data;
+    });
+  }
+
   return {
     getAccessToken,
     getFreePublishList,
     getMaterialNewsList,
+    getMaterialCount,
     uploadArticleImage,
     uploadPermanentImage,
     uploadVideo,

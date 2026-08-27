@@ -376,6 +376,38 @@ app.post('/api/sync-articles', auth, async (req, res) => {
   }
 });
 
+// 接口权限诊断：把微信那边的真实情况打出来，避免靠猜。
+app.post('/api/probe-wechat', auth, async (req, res) => {
+  const { accountName } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+
+  const out = {};
+  let client;
+  try {
+    client = getWechatClient(accountName);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+
+  const probe = async (key, fn) => {
+    try { out[key] = { ok: true, data: await fn() }; }
+    catch (e) { out[key] = { ok: false, error: e.message }; }
+  };
+
+  await probe('发布能力',   () => client.getFreePublishList(0, 20).then(d => ({
+    total_count: d.total_count, item_count: d.item_count, 本页条数: (d.item || []).length,
+  })));
+  await probe('素材数量',   () => client.getMaterialCount());
+  await probe('素材图文首页', () => client.getMaterialNewsList(0, 20).then(d => ({
+    total_count: d.total_count, item_count: d.item_count, 本页条数: (d.item || []).length,
+  })));
+  await probe('素材图文次页', () => client.getMaterialNewsList(20, 20).then(d => ({
+    total_count: d.total_count, item_count: d.item_count, 本页条数: (d.item || []).length,
+  })));
+
+  res.json({ ok: true, accountName, probe: out });
+});
+
 app.get('/api/index-stats', auth, (req, res) => {
   const accountName = req.query.accountName;
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });

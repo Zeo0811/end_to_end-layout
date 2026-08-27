@@ -167,6 +167,7 @@
         <div class="add-row">
           <select id="indexAccount" style="width:180px"></select>
           <button class="btn-add" onclick="syncArticles()" id="syncBtn">同步文章库</button>
+          <button class="btn-add" onclick="probeWechat()" id="probeBtn" style="background:#666">诊断接口权限</button>
         </div>
         <div id="indexStats" style="font-size:13px;color:var(--gray);margin-top:12px"></div>
       </div>
@@ -340,6 +341,28 @@
       } finally {
         btn.disabled = false;
         btn.textContent = '同步文章库';
+      }
+    }
+
+    async function probeWechat() {
+      const name = document.getElementById('indexAccount').value;
+      if (!name) return;
+      const btn = document.getElementById('probeBtn');
+      btn.disabled = true; btn.textContent = '诊断中...';
+      const box = document.getElementById('indexStats');
+      box.textContent = '正在逐个探测微信接口...';
+      try {
+        const r = await api('/api/probe-wechat', { method: 'POST', body: JSON.stringify({ accountName: name }) });
+        if (r && r.error) throw new Error(r.error);
+        const lines = Object.entries(r.probe).map(([k, v]) =>
+          v.ok ? `✅ ${k}：${JSON.stringify(v.data)}` : `❌ ${k}：${v.error}`
+        );
+        box.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-all;margin:0;font-size:12px;line-height:1.6">'
+          + lines.map(esc).join('\n') + '</pre>';
+      } catch (e) {
+        box.textContent = '诊断失败: ' + e.message;
+      } finally {
+        btn.disabled = false; btn.textContent = '诊断接口权限';
       }
     }
 
