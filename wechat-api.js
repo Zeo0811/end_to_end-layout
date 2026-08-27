@@ -346,9 +346,28 @@ function createClient(appId, appSecret) {
     });
   }
 
+  // 拉取永久素材里的图文。当账号没有「发布能力」权限（48001）时的退路，
+  // 走的是「素材管理」权限组。返回结构与 freepublish 接近，但没有 thumb_url，
+  // 封面要靠正文第一张图兜底；也可能含未群发的图文（url 为空，后续会被过滤）。
+  async function getMaterialNewsList(offset = 0, count = 20) {
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/material/batchget_material?access_token=${token}`;
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'news', offset, count }),
+      });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`拉取永久素材图文失败: [${data.errcode}] ${data.errmsg}`);
+      return data;
+    });
+  }
+
   return {
     getAccessToken,
     getFreePublishList,
+    getMaterialNewsList,
     uploadArticleImage,
     uploadPermanentImage,
     uploadVideo,

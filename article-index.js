@@ -102,19 +102,45 @@ function indexFromWechatItem(accountName, newsItem, articleId, updateTime) {
   return id;
 }
 
+// 选一个能用的文章来源。
+// 「发布能力」(freepublish) 拿到的数据最全，但不少号没开这个权限，会回 48001。
+// 那就退到「素材管理」(material)，权限组不同，很多号只有后者。
+// 两个都不通就抛错，让用户去公众平台看接口权限。
+async function pickArticleSource(accountName, client) {
+  try {
+    await client.getFreePublishList(0, 1);
+    return { name: 'freepublish', fetch: (o, c) => client.getFreePublishList(o, c) };
+  } catch (e) {
+    if (!/\[48001\]/.test(e.message)) throw e;
+    console.log(`[Index] ${accountName} 无「发布能力」权限，改用永久素材接口`);
+  }
+
+  try {
+    await client.getMaterialNewsList(0, 1);
+    return { name: 'material', fetch: (o, c) => client.getMaterialNewsList(o, c) };
+  } catch (e) {
+    if (/\[48001\]/.test(e.message)) {
+      throw new Error('该公众号既没有「发布能力」也没有「素材管理」接口权限，无法自动拉取历史文章。请到公众平台 → 设置与开发 → 接口权限 查看这两项');
+    }
+    throw e;
+  }
+}
+
 async function syncAccount(accountName, client, { onProgress } = {}) {
+  const source = await pickArticleSource(accountName, client);
   let offset = 0, total = 0, seen = 0;
 
   while (true) {
-    const page = await client.getFreePublishList(offset, PAGE_SIZE);
+    const page = await source.fetch(offset, PAGE_SIZE);
     const items = page.item || [];
     if (items.length === 0) break;
 
     for (const it of items) {
       const news = (it.content && it.content.news_item) || [];
       // 只索引多图文的头条。次条封面和链接的可用性不稳，先不进推荐池。
+      // 素材接口用 media_id 标识，发布接口用 article_id，取到哪个算哪个。
       if (news[0]) {
-        indexFromWechatItem(accountName, news[0], it.article_id, it.update_time);
+        indexFromWechatItem(accountName, news[0], it.article_id || it.media_id || '', it.update_time);
         seen++;
       }
     }
@@ -126,8 +152,8 @@ async function syncAccount(accountName, client, { onProgress } = {}) {
   }
 
   db.setSyncMeta(accountName, new Date().toISOString());
-  console.log(`[Index] ${accountName} 同步完成，共 ${seen} 篇`);
-  return { added: seen, updated: seen, total: seen };
+  console.log(`[Index] ${accountName} 同步完成（来源 ${source.name}），共 ${seen} 篇`);
+  return { added: seen, updated: seen, total: seen, source: source.name };
 }
 
 module.exports = {

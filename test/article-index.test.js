@@ -248,3 +248,53 @@ test('syncAccount: 重复同步不产生重复行', async () => {
   await idx.syncAccount(acc, fakeClient);
   assert.strictEqual(db.listPublishedArticles(acc).length, 1);
 });
+
+test('syncAccount: 没有发布能力权限时自动降级到永久素材接口', async () => {
+  const acc = '降级号';
+  const material = [{
+    media_id: 'mid-1', update_time: 1756000000,
+    content: { news_item: [{
+      title: '素材接口拉到的文章', digest: '', 
+      content: '<p>讲 Widget 这个产品</p><img src="https://img/inline.jpg">',
+      url: 'https://mp.weixin.qq.com/s/mat-1',
+    }] },
+  }];
+
+  let freeCalls = 0, matCalls = 0;
+  const fakeClient = {
+    async getFreePublishList() { freeCalls++; throw new Error('拉取已发布文章失败: [48001] api unauthorized'); },
+    async getMaterialNewsList(offset, count) {
+      matCalls++;
+      return { item: material.slice(offset, offset + count), total_count: 1, item_count: offset === 0 ? 1 : 0 };
+    },
+  };
+
+  const result = await idx.syncAccount(acc, fakeClient);
+  assert.strictEqual(result.source, 'material', '应报告实际使用的来源');
+  assert.ok(freeCalls >= 1 && matCalls >= 1);
+
+  const rows = db.listPublishedArticles(acc);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].url, 'https://mp.weixin.qq.com/s/mat-1');
+  // 素材接口不给 thumb_url，封面必须由正文第一张图兜底
+  assert.strictEqual(rows[0].thumbUrl, 'https://img/inline.jpg');
+});
+
+test('syncAccount: 两个接口都无权限时给出可操作的错误', async () => {
+  const fakeClient = {
+    async getFreePublishList() { throw new Error('拉取已发布文章失败: [48001] api unauthorized'); },
+    async getMaterialNewsList() { throw new Error('拉取永久素材图文失败: [48001] api unauthorized'); },
+  };
+  await assert.rejects(
+    () => idx.syncAccount('无权号', fakeClient),
+    e => /接口权限/.test(e.message) && /发布能力/.test(e.message) && /素材管理/.test(e.message),
+  );
+});
+
+test('syncAccount: 非权限类错误照常抛出，不误降级', async () => {
+  const fakeClient = {
+    async getFreePublishList() { throw new Error('拉取已发布文章失败: [40001] invalid credential'); },
+    async getMaterialNewsList() { throw new Error('不该走到这里'); },
+  };
+  await assert.rejects(() => idx.syncAccount('凭证错号', fakeClient), /40001/);
+});

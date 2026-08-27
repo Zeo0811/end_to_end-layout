@@ -329,6 +329,10 @@
         });
         if (r && r.error) throw new Error(r.error);
         await loadIndexStats();
+        if (r.source) {
+          const label = r.source === 'freepublish' ? '发布能力接口' : '永久素材接口';
+          document.getElementById('indexStats').textContent += ` · 数据来源：${label}`;
+        }
       } catch (e) {
         document.getElementById('indexStats').textContent = '同步失败: ' + e.message;
       } finally {
