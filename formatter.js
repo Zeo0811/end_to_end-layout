@@ -110,6 +110,10 @@ const S = {
   footnotes_title:   `font-size: 12px; font-weight: bold; color: #888888; margin-bottom: .6em; text-transform: uppercase; letter-spacing: 1px;`,
   footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: normal; overflow-wrap: break-word;`,
   footnote_num:      `color: #222222; font-weight: bold; margin-right: 4px;`,
+
+  recommend_wrapper: `margin: 40px 0 0; padding-top: 24px; border-top: 1px solid rgba(0,0,0,.1);`,
+  recommend_title:   `display: block; font-size: 15px; font-weight: 600; color: #327848; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; margin: 0 0 20px; text-align: left;`,
+  recommend_img:     `width: 100%; max-width: 100%; height: auto; display: block; margin: 0 0 30px;`,
 };
 
 function applyS(key, content, defaultTag = 'section') {
@@ -118,7 +122,7 @@ function applyS(key, content, defaultTag = 'section') {
   return `<${defaultTag} style="${val}">${content}</${defaultTag}>`;
 }
 
-function formatToWechat(parsedData) {
+function formatToWechat(parsedData, options = {}) {
   if (!parsedData || !parsedData.blocks) {
     return '<p style="color:red">解析数据为空，请重试</p>';
   }
@@ -138,6 +142,8 @@ function formatToWechat(parsedData) {
   let html = '';
   for (let i = startIndex; i < blocks.length; i++) html += renderBlock(blocks[i], links, 0);
   if (links.length > 0) html += renderFootnotes(links);
+  // appendHtml 必须落在 wrapper 之内，否则丢掉基础字体与字色
+  html += options.appendHtml || '';
   return `<section style="${S.wrapper}">${html}</section>`;
 }
 
@@ -369,4 +375,15 @@ function escAttr(text) {
   return String(text || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-module.exports = { formatToWechat };
+// 文末「推荐阅读」板块。cards 为空时返回空串，整个板块不出现。
+// 图片用 data URI，publishArticle 的 processHtmlImages 会自动上传到微信并换成 mmbiz 地址。
+function buildRecommendBlock(cards) {
+  if (!Array.isArray(cards) || cards.length === 0) return '';
+  // alt 是正文内容，用 escHtml（转义 & < > "）；href/src 是 URL，escAttr 转引号就够
+  const items = cards.map(c =>
+    `<a href="${escAttr(c.url)}"><img src="${escAttr(c.dataUri)}" alt="${escHtml(c.title)}" style="${S.recommend_img}"></a>`
+  ).join('');
+  return `<section style="${S.recommend_wrapper}"><section style="${S.recommend_title}">推荐阅读</section>${items}</section>`;
+}
+
+module.exports = { formatToWechat, buildRecommendBlock };

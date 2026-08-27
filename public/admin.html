@@ -157,6 +157,19 @@
           <button class="btn-add" onclick="addUser()"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 添加</button>
         </div>
       </div>
+
+      <!-- 文章库 -->
+      <div class="card">
+        <h2>文章库</h2>
+        <p style="font-size:13px;color:var(--gray);margin:0 0 12px">
+          推荐阅读的候选来源。服务启动和每 6 小时会自动同步，这里可以手动触发。
+        </p>
+        <div class="add-row">
+          <select id="indexAccount" style="width:180px"></select>
+          <button class="btn-add" onclick="syncArticles()" id="syncBtn">同步文章库</button>
+        </div>
+        <div id="indexStats" style="font-size:13px;color:var(--gray);margin-top:12px"></div>
+      </div>
     </div>
   </div>
 
@@ -188,6 +201,7 @@
         lucide.createIcons();
         loadAccounts();
         loadUsers();
+        loadIndexAccounts();
       } catch {
         window.location.href = '/';
       }
@@ -277,6 +291,53 @@
       d.textContent = s;
       return d.innerHTML;
     }
-  </script>
+  
+    // ── 文章库 ──
+
+    async function loadIndexAccounts() {
+      const { accounts } = await api('/api/accounts');
+      const sel = document.getElementById('indexAccount');
+      sel.innerHTML = accounts.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');
+      if (accounts.length) loadIndexStats();
+      else document.getElementById('indexStats').textContent = '还没有配置公众号账号';
+    }
+
+    async function loadIndexStats() {
+      const name = document.getElementById('indexAccount').value;
+      if (!name) return;
+      try {
+        const s = await api('/api/index-stats?accountName=' + encodeURIComponent(name));
+        const last = s.lastSyncedAt ? new Date(s.lastSyncedAt).toLocaleString('zh-CN') : '从未同步';
+        document.getElementById('indexStats').textContent =
+          `已发布 ${s.published} 篇 · 待回填 ${s.pending} 篇 · 上次同步：${last}`;
+      } catch (e) {
+        document.getElementById('indexStats').textContent = '读取失败: ' + e.message;
+      }
+    }
+
+    async function syncArticles() {
+      const name = document.getElementById('indexAccount').value;
+      if (!name) return;
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.textContent = '同步中...';
+      document.getElementById('indexStats').textContent = '正在从微信拉取已群发文章...';
+      try {
+        const r = await api('/api/sync-articles', {
+          method: 'POST',
+          body: JSON.stringify({ accountName: name }),
+        });
+        if (r && r.error) throw new Error(r.error);
+        await loadIndexStats();
+      } catch (e) {
+        document.getElementById('indexStats').textContent = '同步失败: ' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '同步文章库';
+      }
+    }
+
+    document.getElementById('indexAccount').addEventListener('change', loadIndexStats);
+</script>
 </body>
 </html>

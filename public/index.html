@@ -436,7 +436,16 @@
 
     /* 桌面端隐藏移动端日志卡片 */
     .mobile-logs { display: none; }
-  </style>
+      .recommend-picker { margin-top: 16px; padding: 16px; border: 1px solid rgba(0,0,0,.12); background: #fafafa; }
+    .recommend-picker-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; color: #555; }
+    .recommend-item { display: flex; align-items: center; gap: 10px; padding: 8px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,.06); }
+    .recommend-item:last-child { border-bottom: none; }
+    .recommend-item:hover { background: rgba(0,0,0,.03); }
+    .recommend-item img { width: 72px; height: 40px; object-fit: cover; flex-shrink: 0; background: #eee; }
+    .recommend-item .ri-title { font-size: 13px; color: #222; line-height: 1.4; flex: 1; }
+    .recommend-item .ri-why { font-size: 11px; color: #888; margin-top: 3px; }
+    .recommend-picker-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+</style>
 </head>
 <body>
 
@@ -527,6 +536,17 @@
               <span class="progress-fill" id="progressFill"></span>
               <span id="publishBtnText">发布到草稿箱</span>
             </button>
+            <div class="recommend-picker" id="recommendPicker" style="display:none">
+              <div class="recommend-picker-head">
+                <span id="recommendHint">找到相关文章</span>
+                <button class="btn-text" onclick="toggleAllRecommend()" id="recommendToggleAll">全选</button>
+              </div>
+              <div id="recommendList"></div>
+              <div class="recommend-picker-foot">
+                <button class="modal-btn modal-btn-cancel" onclick="cancelPrepare()">取消</button>
+                <button class="modal-btn" onclick="confirmAndPublish()" id="recommendConfirmBtn">确认并发布</button>
+              </div>
+            </div>
             <div class="publish-log" id="publishLog"></div>
             <div class="status-bar" id="status"></div>
           </div>
@@ -844,117 +864,207 @@
         : '<option value="">暂无账号</option>';
     }
 
+    // 读一条 SSE 流。onProgress 收进度，返回 done 事件的 payload。
+    // 流断了但没收到 done，抛错，由调用方提示。
+    async function readSSE(res, onProgress) {
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '', result = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === 'progress') onProgress(data);
+            else if (data.type === 'done') result = data;
+          } catch (_) {}
+        }
+      }
+      if (!result) throw new Error('连接中断，服务端可能内存不足');
+      return result;
+    }
+
+    let currentPrepare = null; // { prepareId, title, author, digest }
+
+    function publishUI() {
+      return {
+        btn:     document.getElementById('publishBtn'),
+        btnText: document.getElementById('publishBtnText'),
+        fill:    document.getElementById('progressFill'),
+        logEl:   document.getElementById('publishLog'),
+      };
+    }
+
+    function addPublishLog(msg) {
+      const logEl = document.getElementById('publishLog');
+      const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      logEl.innerHTML += `<div class="log-line"><span class="log-time">${now}</span><span class="log-msg">${esc(msg)}</span></div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setPublishBusy(busy, text) {
+      const { btn, btnText } = publishUI();
+      btn.disabled = busy;
+      btn.classList.toggle('publishing', busy);
+      if (text) btnText.textContent = text;
+    }
+
+    function resetPublishBtn() {
+      const { fill, btnText } = publishUI();
+      setTimeout(() => { fill.style.width = '0'; btnText.textContent = '发布到草稿箱'; }, 2000);
+    }
+
     async function doPublish() {
       const url         = document.getElementById('urlInput').value.trim();
       const accountName = document.getElementById('accountSelect').value;
       const author      = document.getElementById('authorInput').value.trim();
       const digest      = document.getElementById('digestInput').value.trim();
 
-      if (!url) return showModal({ icon: SVG_MODAL_EDIT, title: '提示', msg: '请输入 Notion 或飞书链接', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
+      if (!url)         return showModal({ icon: SVG_MODAL_EDIT, title: '提示', msg: '请输入 Notion 或飞书链接', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
       if (!accountName) return showModal({ icon: SVG_MODAL_MEGAPHONE, title: '提示', msg: '请先选择目标公众号', confirmText: '知道了', confirmClass: 'modal-btn-cancel' });
 
-      const btn = document.getElementById('publishBtn');
-      const btnText = document.getElementById('publishBtnText');
-      const fill = document.getElementById('progressFill');
-      const logEl = document.getElementById('publishLog');
-
-      btn.disabled = true;
-      btn.classList.add('publishing');
-      fill.style.width = '5%';
-      btnText.textContent = '准备中...';
+      const { fill, logEl } = publishUI();
+      document.getElementById('recommendPicker').style.display = 'none';
       logEl.innerHTML = '';
       setStatus('', '');
+      fill.style.width = '5%';
+      setPublishBusy(true, '准备中...');
+      addPublishLog('开始解析文章...');
 
-      function addLog(msg) {
-        const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-        logEl.innerHTML += `<div class="log-line"><span class="log-time">${now}</span><span class="log-msg">${esc(msg)}</span></div>`;
-        logEl.scrollTop = logEl.scrollHeight;
+      try {
+        const res = await fetch('/api/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ url, accountName }),
+        });
+        const data = await readSSE(res, d => {
+          fill.style.width = d.percent + '%';
+          setPublishBusy(true, d.msg);
+          addPublishLog(d.msg);
+        });
+
+        if (!data.ok) {
+          addPublishLog('❌ 失败: ' + data.error);
+          setStatus('error', '失败: ' + esc(data.error));
+          setPublishBusy(false);
+          resetPublishBtn();
+          return;
+        }
+
+        currentPrepare = { prepareId: data.prepareId, title: data.title, author, digest };
+
+        // 没有相关文章就不打断，直接发
+        if (!data.candidates || data.candidates.length === 0) {
+          addPublishLog('没有找到相关的历史文章，跳过推荐板块');
+          await runPublish([]);
+          return;
+        }
+        showRecommendPicker(data.candidates);
+      } catch (e) {
+        addPublishLog('❌ 请求异常: ' + e.message);
+        setStatus('error', '请求异常: ' + esc(e.message));
+        setPublishBusy(false);
+        resetPublishBtn();
       }
+    }
 
-      addLog('开始发布任务...');
+    function showRecommendPicker(candidates) {
+      const picker = document.getElementById('recommendPicker');
+      document.getElementById('recommendHint').textContent =
+        `找到 ${candidates.length} 篇相关文章，勾选后合成到文末（可以一篇都不选）`;
+      document.getElementById('recommendToggleAll').textContent = '全选';
+      document.getElementById('recommendList').innerHTML = candidates.map(c => `
+        <label class="recommend-item">
+          <input type="checkbox" class="ri-check" value="${c.id}">
+          <img src="${esc(c.thumbUrl || '')}" alt="">
+          <div>
+            <div class="ri-title">${esc(c.title)}</div>
+            <div class="ri-why">共同话题：${esc((c.sharedEntities || []).join('、'))}</div>
+          </div>
+        </label>
+      `).join('');
+      picker.style.display = 'block';
+      // 选择期间禁用发布按钮，避免重复发起一次新的 prepare
+      setPublishBusy(true, '请选择推荐文章...');
+    }
+
+    function toggleAllRecommend() {
+      const boxes = [...document.querySelectorAll('.ri-check')];
+      const target = !boxes.every(b => b.checked);
+      boxes.forEach(b => { b.checked = target; });
+      document.getElementById('recommendToggleAll').textContent = target ? '全不选' : '全选';
+    }
+
+    function cancelPrepare() {
+      document.getElementById('recommendPicker').style.display = 'none';
+      currentPrepare = null;
+      addPublishLog('已取消');
+      setPublishBusy(false);
+      resetPublishBtn();
+    }
+
+    async function confirmAndPublish() {
+      const ids = [...document.querySelectorAll('.ri-check:checked')].map(b => Number(b.value));
+      document.getElementById('recommendPicker').style.display = 'none';
+      await runPublish(ids);
+    }
+
+    async function runPublish(selectedIds) {
+      if (!currentPrepare) return;
+      const { fill } = publishUI();
+      setPublishBusy(true, '发布中...');
 
       try {
         const res = await fetch('/api/publish', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
-          body: JSON.stringify({ url, accountName, author, digest }),
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({
+            prepareId: currentPrepare.prepareId,
+            selectedIds,
+            author: currentPrepare.author,
+            digest: currentPrepare.digest,
+          }),
         });
 
-        // 检查是否是 SSE 流
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('text/event-stream')) {
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
+        if (res.status === 410) {
+          const err = await res.json();
+          addPublishLog('❌ ' + err.error);
+          setStatus('error', esc(err.error));
+          return;
+        }
 
-          let gotDone = false;
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
+        const data = await readSSE(res, d => {
+          fill.style.width = d.percent + '%';
+          setPublishBusy(true, d.msg);
+          addPublishLog(d.msg);
+        });
 
-            const lines = buffer.split('\n');
-            buffer = lines.pop(); // 保留未完成的行
-
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === 'progress') {
-                  fill.style.width = data.percent + '%';
-                  btnText.textContent = data.msg;
-                  addLog(data.msg);
-                } else if (data.type === 'done') {
-                  gotDone = true;
-                  if (data.ok) {
-                    fill.style.width = '100%';
-                    btnText.textContent = '发布成功!';
-                    addLog(`\u2705 草稿创建成功: ${data.title}`);
-                    setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
-                    document.getElementById('urlInput').value = '';
-                    document.getElementById('authorInput').value = '';
-                    document.getElementById('digestInput').value = '';
-                    launchFireworks();
-                  } else {
-                    addLog(`\u274C 失败: ${data.error}`);
-                    setStatus('error', `失败: ${esc(data.error)}`);
-                  }
-                }
-              } catch (_) {}
-            }
-          }
-          // SSE 流结束但没有收到完成事件 — 服务端可能崩溃或连接中断
-          if (!gotDone) {
-            addLog('\u274C 连接中断，服务端可能内存不足');
-            setStatus('error', '发布失败：服务端连接中断，请稍后重试');
-          }
+        if (data.ok) {
+          fill.style.width = '100%';
+          setPublishBusy(true, '发布成功!');
+          addPublishLog(`✅ 草稿创建成功: ${data.title}`);
+          setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
+          document.getElementById('urlInput').value = '';
+          document.getElementById('authorInput').value = '';
+          document.getElementById('digestInput').value = '';
+          launchFireworks();
         } else {
-          // fallback: 普通 JSON 响应
-          const data = await res.json();
-          if (data.ok) {
-            fill.style.width = '100%';
-            setStatus('success', `\u{1F389} 发布成功！「${esc(data.title)}」已保存到草稿箱`);
-            document.getElementById('urlInput').value = '';
-            document.getElementById('authorInput').value = '';
-            document.getElementById('digestInput').value = '';
-            launchFireworks();
-          } else {
-            setStatus('error', `失败: ${esc(data.error)}`);
-          }
+          addPublishLog('❌ 失败: ' + data.error);
+          setStatus('error', '失败: ' + esc(data.error));
         }
       } catch (e) {
-        addLog(`\u274C 请求异常: ${e.message}`);
-        setStatus('error', `请求异常: ${e.message}`);
+        addPublishLog('❌ 请求异常: ' + e.message);
+        setStatus('error', '请求异常: ' + esc(e.message));
       } finally {
-        btn.disabled = false;
-        btn.classList.remove('publishing');
-        setTimeout(() => {
-          fill.style.width = '0';
-          btnText.textContent = '发布到草稿箱';
-        }, 2000);
+        currentPrepare = null;
+        setPublishBusy(false);
+        resetPublishBtn();
         loadLogs();
       }
     }

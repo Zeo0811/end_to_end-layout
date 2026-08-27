@@ -330,8 +330,25 @@ function createClient(appId, appSecret) {
     });
   }
 
+  // 拉取已群发文章列表。offset 从 0 开始，count 上限 20。
+  async function getFreePublishList(offset = 0, count = 20) {
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/freepublish/batchget?access_token=${token}`;
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ offset, count, no_content: 0 }),
+      });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`拉取已发布文章失败: [${data.errcode}] ${data.errmsg}`);
+      return data;
+    });
+  }
+
   return {
     getAccessToken,
+    getFreePublishList,
     uploadArticleImage,
     uploadPermanentImage,
     uploadVideo,
