@@ -37,6 +37,42 @@ db.exec(`
     error_msg    TEXT,
     created_at   TEXT DEFAULT (datetime('now', '+8 hours'))
   );
+
+  CREATE TABLE IF NOT EXISTS articles (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_name  TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    digest        TEXT,
+    url           TEXT,
+    thumb_url     TEXT,
+    article_id    TEXT,
+    media_id      TEXT,
+    source_url    TEXT,
+    status        TEXT NOT NULL DEFAULT 'pending',
+    body_text     TEXT,
+    summary_text  TEXT,
+    published_at  TEXT,
+    created_at    TEXT DEFAULT (datetime('now', '+8 hours')),
+    updated_at    TEXT DEFAULT (datetime('now', '+8 hours'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(account_name, status);
+  CREATE INDEX IF NOT EXISTS idx_articles_url    ON articles(url);
+  CREATE INDEX IF NOT EXISTS idx_articles_media  ON articles(account_name, media_id);
+
+  CREATE TABLE IF NOT EXISTS article_entities (
+    article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+    entity     TEXT NOT NULL,
+    weight     REAL NOT NULL DEFAULT 1,
+    PRIMARY KEY (article_id, entity)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_entities ON article_entities(entity);
+
+  CREATE TABLE IF NOT EXISTS sync_meta (
+    account_name    TEXT PRIMARY KEY,
+    last_synced_at  TEXT
+  );
 `);
 
 // ── 密码哈希 ──
@@ -157,6 +193,157 @@ function getLogs(page = 1, pageSize = 20) {
   return { rows, total, page, pageSize };
 }
 
+// ── 文章库 ──
+
+function upsertArticle(a) {
+  const acc = a.accountName;
+  let existing = null;
+  if (a.id) {
+    // 显式指定行。回填 pending 时必须走这条：那一刻要写入 url，
+    // 但 pending 行的 url 还是空的，按 url 查不到会误插新行。
+    existing = db.prepare('SELECT id FROM articles WHERE id = ?').get(a.id);
+  } else if (a.url) {
+    existing = db.prepare('SELECT id FROM articles WHERE url = ?').get(a.url);
+  } else if (a.mediaId) {
+    existing = db.prepare('SELECT id FROM articles WHERE account_name = ? AND media_id = ?').get(acc, a.mediaId);
+  }
+
+  if (existing) {
+    // COALESCE：新值为 null/空串时保留旧值，避免回填时把好数据覆盖成空
+    db.prepare(`
+      UPDATE articles SET
+        title = COALESCE(@title, title),
+        digest = COALESCE(@digest, digest),
+        url = COALESCE(NULLIF(@url, ''), url),
+        thumb_url = COALESCE(NULLIF(@thumbUrl, ''), thumb_url),
+        article_id = COALESCE(NULLIF(@articleId, ''), article_id),
+        media_id = COALESCE(NULLIF(@mediaId, ''), media_id),
+        source_url = COALESCE(NULLIF(@sourceUrl, ''), source_url),
+        status = COALESCE(@status, status),
+        body_text = COALESCE(NULLIF(@bodyText, ''), body_text),
+        summary_text = COALESCE(NULLIF(@summaryText, ''), summary_text),
+        published_at = COALESCE(NULLIF(@publishedAt, ''), published_at),
+        updated_at = datetime('now', '+8 hours')
+      WHERE id = @id
+    `).run({
+      id: existing.id,
+      title: a.title ?? null, digest: a.digest ?? null,
+      url: a.url || '', thumbUrl: a.thumbUrl || '',
+      articleId: a.articleId || '', mediaId: a.mediaId || '',
+      sourceUrl: a.sourceUrl || '', status: a.status ?? null,
+      bodyText: a.bodyText || '', summaryText: a.summaryText || '',
+      publishedAt: a.publishedAt || '',
+    });
+    return existing.id;
+  }
+
+  const info = db.prepare(`
+    INSERT INTO articles
+      (account_name, title, digest, url, thumb_url, article_id, media_id,
+       source_url, status, body_text, summary_text, published_at)
+    VALUES
+      (@accountName, @title, @digest, @url, @thumbUrl, @articleId, @mediaId,
+       @sourceUrl, @status, @bodyText, @summaryText, @publishedAt)
+  `).run({
+    accountName: acc, title: a.title || '未命名', digest: a.digest || '',
+    url: a.url || '', thumbUrl: a.thumbUrl || '',
+    articleId: a.articleId || '', mediaId: a.mediaId || '',
+    sourceUrl: a.sourceUrl || '', status: a.status || 'pending',
+    bodyText: a.bodyText || '', summaryText: a.summaryText || '',
+    publishedAt: a.publishedAt || '',
+  });
+  return info.lastInsertRowid;
+}
+
+const _replaceEntities = db.transaction((articleId, entities) => {
+  db.prepare('DELETE FROM article_entities WHERE article_id = ?').run(articleId);
+  const ins = db.prepare('INSERT INTO article_entities (article_id, entity, weight) VALUES (?, ?, ?)');
+  for (const [entity, weight] of Object.entries(entities || {})) ins.run(articleId, entity, weight);
+});
+
+function setArticleEntities(articleId, entities) {
+  _replaceEntities(articleId, entities);
+}
+
+function getArticleEntities(articleId) {
+  const rows = db.prepare('SELECT entity, weight FROM article_entities WHERE article_id = ?').all(articleId);
+  return Object.fromEntries(rows.map(r => [r.entity, r.weight]));
+}
+
+function listPublishedArticles(accountName) {
+  const rows = db.prepare(`
+    SELECT id, title, url, thumb_url AS thumbUrl, source_url AS sourceUrl,
+           summary_text AS summaryText, published_at AS publishedAt
+    FROM articles
+    WHERE account_name = ? AND status = 'published' AND url IS NOT NULL AND url != ''
+  `).all(accountName);
+
+  const entRows = db.prepare(`
+    SELECT ae.article_id AS id, ae.entity, ae.weight
+    FROM article_entities ae
+    JOIN articles a ON a.id = ae.article_id
+    WHERE a.account_name = ? AND a.status = 'published'
+  `).all(accountName);
+
+  const byId = new Map(rows.map(r => [r.id, { ...r, entities: {} }]));
+  for (const e of entRows) {
+    const row = byId.get(e.id);
+    if (row) row.entities[e.entity] = e.weight;
+  }
+  return [...byId.values()];
+}
+
+function getEntityDocFreq(accountName) {
+  const { total } = db.prepare(`
+    SELECT COUNT(*) AS total FROM articles WHERE account_name = ? AND status = 'published'
+  `).get(accountName);
+
+  const rows = db.prepare(`
+    SELECT ae.entity, COUNT(DISTINCT ae.article_id) AS df
+    FROM article_entities ae
+    JOIN articles a ON a.id = ae.article_id
+    WHERE a.account_name = ? AND a.status = 'published'
+    GROUP BY ae.entity
+  `).all(accountName);
+
+  return { docFreq: Object.fromEntries(rows.map(r => [r.entity, r.df])), totalDocs: total };
+}
+
+function findPendingByTitle(accountName, title) {
+  return db.prepare(`
+    SELECT * FROM articles WHERE account_name = ? AND title = ? AND status = 'pending'
+    ORDER BY id DESC LIMIT 1
+  `).get(accountName, title);
+}
+
+function getIndexStats(accountName) {
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
+      SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending
+    FROM articles WHERE account_name = ?
+  `).get(accountName);
+  return {
+    total: row.total || 0,
+    published: row.published || 0,
+    pending: row.pending || 0,
+    lastSyncedAt: getSyncMeta(accountName),
+  };
+}
+
+function setSyncMeta(accountName, iso) {
+  db.prepare(`
+    INSERT INTO sync_meta (account_name, last_synced_at) VALUES (?, ?)
+    ON CONFLICT(account_name) DO UPDATE SET last_synced_at = excluded.last_synced_at
+  `).run(accountName, iso);
+}
+
+function getSyncMeta(accountName) {
+  const row = db.prepare('SELECT last_synced_at FROM sync_meta WHERE account_name = ?').get(accountName);
+  return row ? row.last_synced_at : null;
+}
+
 module.exports = {
   ensureAdmin,
   seedAccountsFromEnv,
@@ -173,4 +360,13 @@ module.exports = {
   updateLogStatus,
   getLogById,
   getLogs,
+  upsertArticle,
+  setArticleEntities,
+  getArticleEntities,
+  listPublishedArticles,
+  getEntityDocFreq,
+  findPendingByTitle,
+  getIndexStats,
+  setSyncMeta,
+  getSyncMeta,
 };
