@@ -41,10 +41,10 @@ const CODE_THEME = {
   'hljs-template-variable': { color: '#ab5656' },
   'hljs-variable':          { color: '#ab5656' },
   'hljs-literal':           { color: '#695' },
-  'hljs-addition':          { color: '#397300' },
-  'hljs-built_in':          { color: '#397300' },
-  'hljs-bullet':            { color: '#397300' },
-  'hljs-code':              { color: '#397300' },
+  'hljs-addition':          { color: '#327848' },
+  'hljs-built_in':          { color: '#327848' },
+  'hljs-bullet':            { color: '#327848' },
+  'hljs-code':              { color: '#327848' },
   'hljs-meta':              { color: '#1f7199' },
   'hljs-emphasis':          { 'font-style': 'italic' },
   'hljs-strong':            { 'font-weight': '700' },
@@ -68,9 +68,9 @@ const S = {
   code_inline: `background: rgba(135,131,120,.15); border-radius: 4px; font-size: 85%; padding: 0.2em 0.4em; color: #222222; font-family: ${MONO};`,
   s: `text-decoration: line-through; color: #888888;`,
 
-  blockquote_wrapper: `line-height: 26px; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 0 0 30px; border-left: 2px solid #327848; background-color: #f5f5f5; font-family: ${WX_FONT}; letter-spacing: 0.1em; color: #327848; font-size: 15px;`,
+  blockquote_wrapper: `line-height: ${WX_P_LH}; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 0 0 30px; border-left: 2px solid #327848; background-color: #f5f5f5; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #327848; font-size: ${WX_SIZE};`,
 
-  callout_wrapper: `font-size: 15px; white-space: normal; margin: 0 0 30px; color: #3f3f3f; font-family: ${WX_FONT}; line-height: 26px; letter-spacing: 0.1em; background-color: #f9fdf5; border: 1px solid #327848; padding: 16px 20px;`,
+  callout_wrapper: `font-size: ${WX_SIZE}; white-space: normal; margin: 0 0 30px; color: ${WX_COLOR}; font-family: ${WX_FONT}; line-height: ${WX_P_LH}; letter-spacing: ${WX_LS}; background-color: #f7faf8; border: 1px solid #327848; padding: 16px 20px;`,
   callout_content: ``,
 
   code_wrapper:  `margin: 0 10px 30px; display: block; width: calc(100% - 20px); box-sizing: border-box; font-size: 15px; padding: 10px; color: #333; position: relative; background-color: #fafafa; border: 1px solid #f0f0f0; border-radius: 5px; white-space: pre; box-shadow: rgba(0,0,0,.3) 0px 2px 10px; overflow-x: auto; text-align: left; font-family: ${MONO};`,
@@ -80,10 +80,10 @@ const S = {
 
   hr: `border-style: solid; border-width: 1px 0 0; border-color: #797979; margin: 0 0 30px;`,
 
-  ul: `padding-left: 1.5em; font-size: 15px; line-height: 1.75; font-family: ${WX_FONT}; vertical-align: baseline; white-space: normal; color: rgb(51,51,51); margin-bottom: 30px; margin-top: 0;`,
-  ol: `padding-left: 1.5em; font-size: 15px; line-height: 26px; font-family: ${WX_FONT}; vertical-align: baseline; white-space: normal; color: rgb(51,51,51); margin-bottom: 30px; margin-top: 0;`,
-  li_ul: `font-size: 15px; line-height: 26px; font-family: ${WX_FONT}; list-style-position: outside; list-style-type: disc;`,
-  li_ol: `font-size: 15px; line-height: 1.75; font-family: ${WX_FONT}; list-style-position: outside; list-style-type: decimal;`,
+  ul: `padding-left: 1.5em; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; vertical-align: baseline; white-space: normal; color: ${WX_COLOR}; margin-bottom: 30px; margin-top: 0;`,
+  ol: `padding-left: 1.5em; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; vertical-align: baseline; white-space: normal; color: ${WX_COLOR}; margin-bottom: 30px; margin-top: 0;`,
+  li_ul: `font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; list-style-position: outside; list-style-type: disc;`,
+  li_ol: `font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; list-style-position: outside; list-style-type: decimal;`,
   li_p:  `font-family: inherit; vertical-align: baseline; margin: 10px 0;`,
 
   img_wrapper: `margin: 0 0 30px; text-align: center;`,
@@ -97,10 +97,10 @@ const S = {
   toggle_content: `display:block;padding-left:15px;border-left:2px solid rgba(0,0,0,.15);margin-left:4px;`,
 
   table_wrapper: `overflow-x: auto; margin: 0 0 30px;`,
-  table:         `border-collapse: collapse; width: 100%; font-size: 15px; line-height: 1.6; font-family: ${WX_FONT};`,
-  th:            `background: rgba(0,0,0,.05); padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); font-weight: bold; text-align: left; color: #222222;`,
-  td:            `padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); color: #222222;`,
-  td_even:       `padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); color: #222222; background: rgba(0,0,0,.02);`,
+  table:         `border-collapse: collapse; width: 100%; font-size: ${WX_SIZE}; line-height: ${WX_LH}; letter-spacing: ${WX_LS}; font-family: ${WX_FONT};`,
+  th:            `background: rgba(0,0,0,.05); padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); font-weight: bold; text-align: left; color: ${WX_COLOR};`,
+  td:            `padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); color: ${WX_COLOR};`,
+  td_even:       `padding: 7px 13px; border: 1px solid rgba(0,0,0,.15); color: ${WX_COLOR}; background: rgba(0,0,0,.02);`,
 
   embed_wrapper: `margin: 0 0 30px; border: 1px solid rgba(0,0,0,.1); padding: 11px 15px;`,
   embed_label:   `font-size: 12px; color: #888888; margin-bottom: 4px;`,
@@ -270,7 +270,7 @@ function isAllBold(content) {
 function renderList(items, isOrdered, depth) {
   if (!items || items.length === 0) return '';
   const indent = depth > 0 ? `padding-left: ${depth * 1.5}em;` : '';
-  const baseStyle = `text-align: left; line-height: 26px; font-family: ${FONT}; margin: 5px 0; letter-spacing: 0.1em; color: rgb(63,63,63); font-size: 15px; ${indent}`;
+  const baseStyle = `text-align: left; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; margin: 5px 0; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; font-size: ${WX_SIZE}; ${indent}`;
   const markerStyle = `display: inline-block; min-width: 1.5em; margin-right: 0.3em;`;
   const boldMarkerStyle = `${markerStyle} font-weight: 600; color: #327848;`;
 
