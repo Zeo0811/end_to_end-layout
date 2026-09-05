@@ -26,6 +26,14 @@ function parseNotion() {
     const mainEl = document.querySelector('main');
     const divCount = document.querySelectorAll('div[class]').length;
     const blockCount = document.querySelectorAll('[data-block-id]').length;
+    // divs 很少 + 正文为空 = 页面壳加载了但内容没渲染。
+    // 实测最常见的原因是短时间内反复请求同一页面后被 Notion 限流，
+    // 稍等重试即可；报错里直接说清楚，别让人对着 divs=6 猜。
+    const textLen = (document.body.innerText || '').trim().length;
+    if (divCount < 50 && textLen < 100) {
+      throw new Error('Notion 页面没有渲染出内容（可能被限流或页面未公开）。'
+        + `请确认链接可在浏览器无痕窗口打开，然后稍等一两分钟重试。[divs=${divCount}, 正文=${textLen} 字]`);
+    }
     throw new Error(`无法找到Notion页面内容。body.class="${bodyClasses}", main=${!!mainEl}, divs=${divCount}, blocks=${blockCount}, url=${location.href}`);
   }
 
@@ -380,9 +388,16 @@ function parseNotionImage(el) {
 
   if (!src) return null;
 
-  const captionEl =
-    el.querySelector('[placeholder="Add a caption"]') ||
-    el.querySelector('[class*="caption"]');
+  // 图注定位。Notion 改过这段文案，也改过 DOM：
+  //   - 现在的占位符是「Write a caption…」，结尾是省略号字符 U+2026
+  //   - 「Add a caption」是旧版，只在编辑态出现，分享页永远匹配不到
+  //   - class 里没有 caption 字样，靠 class 找是空的
+  // 实测：真实页面 6 张图里 4 张有图注，都在图片块内部，
+  // 剩下 2 张是作者本来就没写，块内只有一个空 div。
+  const captionEl = el.querySelector(
+    '[placeholder="Write a caption\u2026"], [placeholder="Add a caption"], ' +
+    '[placeholder*="caption" i], figcaption, [class*="caption"]'
+  );
   const caption = captionEl ? captionEl.textContent.trim() : '';
 
   return { type: 'image', url: src, caption };
