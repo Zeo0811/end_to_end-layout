@@ -107,8 +107,8 @@ const S = {
   embed_link:    `font-size: 13px; text-decoration: none; color: #222222; border-bottom: 1px solid #222222; word-break: normal; overflow-wrap: break-word;`,
 
   footnotes_wrapper: `margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,.15);`,
-  footnotes_title:   `font-size: 12px; font-weight: bold; color: #888888; margin-bottom: .6em; text-transform: uppercase; letter-spacing: 1px;`,
-  footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: normal; overflow-wrap: break-word;`,
+  footnotes_title:   `font-size: 12px; font-weight: bold; color: #888888; margin-bottom: .6em; text-transform: uppercase; letter-spacing: 1px; text-align: left;`,
+  footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: normal; overflow-wrap: break-word; text-align: left;`,
   footnote_num:      `color: #222222; font-weight: bold; margin-right: 4px;`,
 
   // 文末「推荐阅读」。板块标题与文章 H1 逐项一致；
