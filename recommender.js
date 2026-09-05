@@ -21,35 +21,71 @@ function looksLikeGarbage(key) {
   return false;
 }
 
+// 连续的首字母大写拉丁词是一个整体专名。
+// 「Physical Intelligence」是家公司，拆成 physical + intelligence 之后，
+// intelligence 会去连一堆 artificial intelligence 的文章 —— 实测撞过。
+// 同理还有 Sam Altman、OK Computer、Claude Code。最多三个词。
+const PHRASE_RE = /[A-Z][A-Za-z0-9]{1,}(?: [A-Z][A-Za-z0-9]{1,}){1,2}/g;
+
 function extractEntities(title, bodyText) {
   const ent = {};
+  const partOfPhrase = new Set();   // 已被短语吃掉的单词，不再单独入库
 
-  function bump(raw, weight) {
+  function bump(raw, weight, isPhrase) {
     if (!raw) return;
     // 去掉尾部标点，如 "Cursor." → "cursor"
     const key = String(raw).replace(/[.+\-]+$/, '').toLowerCase().trim();
-    // 中文两字就是词（豆包、原神），拉丁串两字母多是噪声缩写，门槛不同
     const isCJK = /[\u4e00-\u9fa5]/.test(key);
+    // 中文两字就是词（豆包、原神），拉丁串两字母多是噪声缩写，门槛不同
     if (key.length < (isCJK ? 2 : 3)) return;
     if (STOPWORDS.has(key)) return;    // 抽取阶段就挡掉，别进库占位
-    if (!isCJK && looksLikeGarbage(key)) return;
+    // 短语天然比单词长，长度和乱码那套规则只对单词用
+    if (!isCJK && !isPhrase && looksLikeGarbage(key)) return;
     ent[key] = Math.max(ent[key] || 0, weight);
   }
 
-  function scan(text, weight) {
+  // 第一遍：先把多词专名认出来，并记下它们的组成词
+  function scanPhrases(text, weight) {
     if (!text) return;
-    // 英文/数字混合的专有名词
-    for (const m of text.matchAll(/[A-Za-z][A-Za-z0-9.+\-]{1,}/g)) bump(m[0], weight);
-    // 书名号与直角引号内的短串，常是产品名或作品名
-    for (const m of text.matchAll(/[《「]([^》」]{2,12})[》」]/g)) bump(m[1], weight);
-    // 中文词典命中
-    for (const d of DICT) if (text.includes(d)) bump(d, weight);
+    for (const m of String(text).matchAll(PHRASE_RE)) {
+      const words = m[0].toLowerCase().split(' ');
+      // 全是泛词的组合（"AI Coding"）是话题不是对象，不当专名
+      if (words.every(w => STOPWORDS.has(w))) continue;
+      // 至少要有一个词像真名字。全是两字母缩写（"AB CD"）多半是噪声，
+      // 但 "OK Computer" 这种一长一短要留下
+      if (!words.some(w => w.length >= 3)) continue;
+      bump(words.join(' '), weight, true);
+      for (const w of words) partOfPhrase.add(w);
+    }
   }
 
-  scan(title, 3);
+  // 第二遍：单词、书名号、中文词典
+  function scanWords(text, weight) {
+    if (!text) return;
+    for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9.+\-]{1,}/g)) {
+      // 已被某个短语吃掉的词不再单独入库，否则 Physical Intelligence
+      // 里的 intelligence 又会去连不相干的文章
+      if (partOfPhrase.has(m[0].toLowerCase())) continue;
+      bump(m[0], weight);
+    }
+    // 书名号与直角引号内的短串，常是产品名或作品名
+    for (const m of String(text).matchAll(/[《「]([^》」]{2,12})[》」]/g)) bump(m[1], weight);
+    // 中文词典命中
+    for (const d of DICT) if (String(text).includes(d)) bump(d, weight);
+  }
+
   const paras = String(bodyText || '').split(/\n+/).filter(p => p.trim());
-  scan(paras[0] || '', 2);
-  scan(paras.slice(1).join('\n'), 1);
+  const first = paras[0] || '';
+  const rest  = paras.slice(1).join('\n');
+
+  // 短语要先在全文扫一遍，否则正文里的短语压不住标题里的单词
+  scanPhrases(title, 3);
+  scanPhrases(first, 2);
+  scanPhrases(rest, 1);
+
+  scanWords(title, 3);
+  scanWords(first, 2);
+  scanWords(rest, 1);
   return ent;
 }
 

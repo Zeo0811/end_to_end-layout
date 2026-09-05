@@ -253,3 +253,62 @@ test('recommend: 没有发布时间的排在有时间的后面', () => {
   });
   assert.deepStrictEqual(out.map(x => x.id), [2, 1]);
 });
+
+// ── 多词专名 ──
+// 「Physical Intelligence」是家公司，拆成 physical + intelligence 之后，
+// intelligence 会去连一堆 artificial intelligence 的文章 —— 实测撞过。
+
+test('extractEntities: 连续大写词组成的专名当成一个整体', () => {
+  const e = extractEntities('Physical Intelligence 联创 Chelsea Finn 谈物理 AI', '');
+  assert.strictEqual(e['physical intelligence'], 3);
+  assert.strictEqual(e['chelsea finn'], 3);
+});
+
+test('extractEntities: 短语的组成词不再单独入库', () => {
+  const e = extractEntities('Physical Intelligence 联创 Chelsea Finn', '');
+  assert.strictEqual(e.physical, undefined, 'physical 该被短语吃掉');
+  assert.strictEqual(e.intelligence, undefined, 'intelligence 该被短语吃掉');
+  assert.strictEqual(e.chelsea, undefined);
+  assert.strictEqual(e.finn, undefined);
+});
+
+test('extractEntities: 全是泛词的组合不算专名', () => {
+  // 「AI Coding」是话题不是对象
+  const e = extractEntities('为什么 AI Coding 是一个巨大的机遇', '');
+  assert.strictEqual(e['ai coding'], undefined);
+  assert.strictEqual(e.ai, undefined, 'ai 本身是停用词');
+});
+
+test('extractEntities: 单个产品名不受影响', () => {
+  const e = extractEntities('实测 Manus 和 DeepSeek', '');
+  assert.strictEqual(e.manus, 3);
+  assert.strictEqual(e.deepseek, 3);
+});
+
+test('extractEntities: 正文里的短语能压住标题里的单词', () => {
+  // 短语要先在全文扫一遍，否则顺序会导致标题的 intelligence 先入库
+  const e = extractEntities('聊聊 Intelligence 这件事', 'Physical Intelligence 是一家机器人公司');
+  assert.strictEqual(e['physical intelligence'], 2);
+  assert.strictEqual(e.intelligence, undefined, '被短语吃掉了就不该再单独存在');
+});
+
+test('extractEntities: 最多三个词，第四个词另起', () => {
+  const e = extractEntities('One Two Three Four', '');
+  const keys = Object.keys(e);
+  assert.ok(keys.every(k => k.split(' ').length <= 3), `实际: ${keys}`);
+});
+
+test('recommend: 只共享泛词组成部分的文章不再被误召回', () => {
+  const cur  = extractEntities('Physical Intelligence 联创谈机器人', '');
+  const bad  = extractEntities('黄仁勋谈 Artificial Intelligence 的未来', '');
+  const good = extractEntities('Physical Intelligence 发布新模型', '');
+  const out = recommend({
+    current: { entities: cur, summaryText: 'x', url: '', sourceUrl: '' },
+    candidates: [
+      { id: 1, title: '不相干的', url: 'https://mp/1', thumbUrl: 't', entities: bad,  summaryText: 'y', publishedAt: '2026-01-01' },
+      { id: 2, title: '同一家公司', url: 'https://mp/2', thumbUrl: 't', entities: good, summaryText: 'z', publishedAt: '2025-01-01' },
+    ],
+    docFreq: {}, totalDocs: 1000, limit: 8,
+  });
+  assert.deepStrictEqual(out.map(x => x.id), [2], '只该召回真正讲同一家公司的那篇');
+});
