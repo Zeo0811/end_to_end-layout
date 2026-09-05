@@ -23,14 +23,31 @@ test('buildCardHtml: 标题转义，封面嵌入', () => {
   assert.ok(h.includes('2025.09.25'));
 });
 
-test('buildCardHtml: 字体栈与正文同源，不另写一份', () => {
-  const { WX_FONT, WX_LS } = require('../formatter');
+test('buildCardHtml: 内嵌字体，不依赖容器里装了什么', () => {
   const h = buildCardHtml({ title: '标题', date: '2025.01.01', coverDataUri: RED });
-  assert.ok(h.includes(WX_FONT), '必须直接用 formatter 的正文字体栈');
-  assert.ok(h.includes(`letter-spacing: ${WX_LS}`), '字距也走同一个 token');
-  // 尾部补 Noto：容器里没有 PingFang SC（macOS 专有）
-  assert.ok(h.includes('Noto Sans CJK SC'), '容器降级字体');
+  assert.ok(h.includes('@font-face'), '必须内嵌 @font-face');
+  assert.ok(h.includes('data:font/woff2;base64,'), '字体应以 data URI 内嵌');
+  assert.ok(h.includes('"HarmonyOS Sans SC"'), '与 Layout-design 渲染标题图同一套字体');
+  assert.ok(h.includes('font-weight:400') && h.includes('font-weight:600'), '两个字重都要内嵌');
+  // 读取失败时的系统字体兜底
+  assert.ok(h.includes('PingFang SC'), '缺兜底字体');
+});
+
+test('buildCardHtml: 字距与正文同源', () => {
+  const { WX_LS } = require('../formatter');
+  const h = buildCardHtml({ title: '标题', date: '2025.01.01', coverDataUri: RED });
+  assert.ok(h.includes(`letter-spacing: ${WX_LS}`), '字距走 formatter 的 token');
   assert.ok(h.includes('#327848'), '品牌绿');
+});
+
+test('字体文件已随仓库提供且体积可控', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  for (const f of ['HarmonyOS_Sans_SC_Regular.woff2', 'HarmonyOS_Sans_SC_Medium.woff2']) {
+    const p = path.join(__dirname, '..', 'assets', 'fonts', f);
+    assert.ok(fs.existsSync(p), `缺字体文件 ${f}`);
+    const mb = fs.statSync(p).size / 1024 / 1024;
+    assert.ok(mb < 2, `${f} 有 ${mb.toFixed(1)}MB，子集化应压到 1MB 上下`);
+  }
 });
 
 test('buildCardHtml: 字号是正文的 2 倍（卡片是 2 倍图）', () => {

@@ -14,14 +14,43 @@ const CARD_WIDTH   = 375 * SCALE;   // 750
 const COVER_HEIGHT = 150 * SCALE;   // 300 —— 比早先的 180pt 再低一点
 const JPEG_QUALITY = 88;
 
-// 字体栈直接取自 formatter.js 的正文定义，不另写一份 —— 两边各写一份迟早会漂。
-// 尾部补 Noto Sans CJK SC：Railway 容器里没有 PingFang SC（macOS 专有，
-// 且是 Apple 授权字体不能打包），nixpacks 装的是 noto-fonts-cjk-sans，
-// 字形结构与 PingFang 接近。本机开发时仍然命中 PingFang SC。
-const { WX_FONT, WX_LS } = require('./formatter');
+// 字距取自 formatter.js 的正文定义，不另写一份 —— 两边各写一份迟早会漂。
+const { WX_LS } = require('./formatter');
 
-const GREEN     = '#327848';
-const FONT      = `${WX_FONT}, "Noto Sans CJK SC", "Source Han Sans SC"`;
+// 字体内嵌，不依赖容器里装了什么。
+//
+// 正文在读者手机上渲染成什么，取决于他们的设备（iOS 是 PingFang SC，
+// 安卓各不相同），我们控制不了；PingFang 又是 Apple 授权字体，打不进镜像。
+// 所以卡片选 HarmonyOS Sans SC —— 字形结构比 Noto 更接近 PingFang，
+// 而且和 Layout-design 渲染标题图用的是同一套字体，两个仓库出来的图一致。
+//
+// 内嵌的另一个好处：不用再赌 nixpacks 的 noto-fonts-cjk-sans 在容器里生效。
+// 字体已子集化到 GB2312 + 常用标点（7545 字），8MB TTF → 930KB woff2。
+const fs   = require('fs');
+const path = require('path');
+
+const FONT_DIR = path.join(__dirname, 'assets', 'fonts');
+function loadFont(file) {
+  try {
+    return fs.readFileSync(path.join(FONT_DIR, file)).toString('base64');
+  } catch (e) {
+    console.warn(`[Card] 字体 ${file} 读取失败，将回退到系统字体:`, e.message);
+    return null;
+  }
+}
+const FONT_REGULAR = loadFont('HarmonyOS_Sans_SC_Regular.woff2');
+const FONT_MEDIUM  = loadFont('HarmonyOS_Sans_SC_Medium.woff2');
+
+function fontFace(weight, b64) {
+  if (!b64) return '';
+  return `@font-face{font-family:"HarmonyOS Sans SC";font-style:normal;font-weight:${weight};`
+    + `src:url(data:font/woff2;base64,${b64}) format("woff2");}`;
+}
+const FONT_FACES = fontFace(400, FONT_REGULAR) + fontFace(600, FONT_MEDIUM);
+
+const GREEN = '#327848';
+// 内嵌字体排第一；万一读取失败，后面这串是系统字体的兜底
+const FONT  = '"HarmonyOS Sans SC", "PingFang SC", "Noto Sans CJK SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 const TITLE_PX  = 15 * SCALE;       // 30
 const META_PX   = 12 * SCALE;       // 24
 const PAD_Y     = 14 * SCALE;       // 28
@@ -63,6 +92,7 @@ function buildCardHtml({ title, date, coverDataUri }) {
     ? `<div class="meta">${esc(date)}</div>`
     : '';
   return `<!doctype html><html><head><meta charset="utf-8"><style>
+  ${FONT_FACES}
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #fff; font-family: ${FONT}; }
   .card { width: ${CARD_WIDTH}px; background: ${GREEN}; overflow: hidden; }
@@ -80,26 +110,26 @@ function buildCardHtml({ title, date, coverDataUri }) {
   </body></html>`;
 }
 
-// 只在首次渲染时探一次：容器里到底有没有中文字体、命中的是哪一个。
-// 没有的话卡片上的中文会是豆腐块，而这件事在 Railway 上不看日志发现不了。
+// 只在首次渲染时探一次：内嵌字体到底有没有生效。
+// 没生效的话卡片上的中文会用系统字体、甚至变豆腐块，
+// 而这件事在 Railway 上不看日志发现不了。
 let fontProbed = false;
 async function probeFonts(page) {
   if (fontProbed) return;
   fontProbed = true;
   try {
-    const hit = await page.evaluate(() => {
-      const cands = ['PingFang SC', 'Noto Sans CJK SC', 'Source Han Sans SC',
-                     'Hiragino Sans GB', 'Microsoft YaHei', 'Heiti SC'];
+    const hit = await page.evaluate(async () => {
+      await document.fonts.ready;
       return {
-        available: cands.filter(f => document.fonts.check(`30px "${f}"`, '中')),
-        canRenderCJK: document.fonts.check('30px sans-serif', '中'),
+        embedded: document.fonts.check('30px "HarmonyOS Sans SC"', '中'),
+        loaded: [...document.fonts].map(f => `${f.family} ${f.weight} ${f.status}`),
       };
     });
-    if (hit.available.length) {
-      console.log(`[Card] 中文字体可用: ${hit.available.join(', ')}`);
+    if (hit.embedded) {
+      console.log(`[Card] 内嵌字体已生效: ${hit.loaded.join(' | ')}`);
     } else {
-      console.warn('[Card] 警告：没有匹配到任何中文字体，卡片上的中文可能是豆腐块。'
-        + '检查 nixpacks.toml 里的 noto-fonts-cjk-sans 是否生效');
+      console.warn('[Card] 警告：内嵌字体未生效，已回退到系统字体。'
+        + '检查 assets/fonts/*.woff2 是否随构建打包');
     }
   } catch (_) { /* 探测失败不影响出图 */ }
 }
