@@ -982,7 +982,7 @@
       document.getElementById('recommendList').innerHTML = candidates.map(c => `
         <label class="recommend-item">
           <input type="checkbox" class="ri-check" value="${c.id}">
-          <img src="${esc(c.thumbUrl || '')}" alt="">
+          <img src="${esc(c.thumbUrl || '')}" alt="" referrerpolicy="no-referrer" loading="lazy">
           <div>
             <div class="ri-title">${esc(c.title)}</div>
             <div class="ri-why">共同话题：${esc((c.sharedEntities || []).join('、'))}</div>

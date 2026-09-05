@@ -13,15 +13,11 @@ process.env.DATABASE_PATH = tmpDb;
 const db           = require('../db');
 const articleIndex = require('../article-index');
 const { recommend, extractEntities } = require('../recommender');
-const { renderCards } = require('../card-renderer');
 const { formatToWechat, buildRecommendBlock } = require('../formatter');
-const crawler = require('../parsers/crawler');
 
-const RED_DOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const ACC = '管线号';
 
-after(async () => {
-  await crawler.closeBrowser();
+after(() => {
   try { fs.unlinkSync(tmpDb); } catch (_) {}
 });
 
@@ -78,29 +74,28 @@ test('管线：没有共同对象时一篇都不召回', () => {
   assert.deepStrictEqual(picks, []);
 });
 
-test('管线：召回结果能合成卡片并落进正文 wrapper 之内', async () => {
+test('管线：召回结果直接落进正文 wrapper 之内', () => {
   const picks = recommendFor({
     title: 'Cursor 又更新了',
     blocks: [{ type: 'paragraph', content: '这次我们再看看 Cursor' }],
   });
-  // 用固定的 data URI 代替真实封面下载，避免测试依赖网络
-  const cards = await renderCards(picks.map(p => ({ title: p.title, url: p.url, coverDataUri: RED_DOT })));
-  assert.strictEqual(cards.length, 2);
+  assert.strictEqual(picks.length, 2);
 
   const html = formatToWechat(
     { title: 'Cursor 又更新了', blocks: [{ type: 'paragraph', content: '正文' }], links: [] },
-    { appendHtml: buildRecommendBlock(cards) },
+    { appendHtml: buildRecommendBlock(picks) },
   );
 
   assert.ok(html.endsWith('</section>'));
   assert.ok(html.includes('推荐阅读'));
   // 板块必须在最外层 wrapper 之内，否则丢基础字体字色
-  const wrapperEnd = html.lastIndexOf('</section>');
-  assert.ok(html.indexOf('推荐阅读') < wrapperEnd, '推荐板块跑到 wrapper 外面了');
+  assert.ok(html.indexOf('推荐阅读') < html.lastIndexOf('</section>'), '推荐板块跑到 wrapper 外面了');
   // 两个可点击链接，指向真实 mp 地址
   assert.strictEqual((html.match(/<a href="https:\/\/mp\.weixin\.qq\.com\/s\//g) || []).length, 2);
-  // 图片是 data URI，交给 processHtmlImages 上传
-  assert.strictEqual((html.match(/src="data:image\/jpeg;base64,/g) || []).length, 2);
+  // db 出来的 publishedAt 一路传到日期行
+  assert.ok(html.includes('2026.01.01'), '日期应渲染出来');
+  // 纯 HTML，不再有图片
+  assert.ok(!html.includes('<img'), '不应再合成图片');
 });
 
 test('管线：一篇都没选时正文与改造前完全一致', () => {

@@ -111,9 +111,17 @@ const S = {
   footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: normal; overflow-wrap: break-word;`,
   footnote_num:      `color: #222222; font-weight: bold; margin-right: 4px;`,
 
-  recommend_wrapper: `margin: 40px 0 0; padding-top: 24px; border-top: 1px solid rgba(0,0,0,.1);`,
-  recommend_title:   `display: block; font-size: 15px; font-weight: 600; color: #327848; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; margin: 0 0 20px; text-align: left;`,
-  recommend_img:     `width: 100%; max-width: 100%; height: auto; display: block; margin: 0 0 30px;`,
+  // 文末「推荐阅读」。整段沿用正文既有的设计语言：
+  //   板块标题 = H1 的语汇（绿字 / 居中 / fit-content / 绿色下边框），
+  //              但收到 20px + 4px 边框，不与文章真正的 H1 抢层级；
+  //   每张卡片 = callout 的语汇（#f7faf8 底 + 1px 绿边），
+  //              字体字号字距全部走正文那套，不再靠截图。
+  recommend_wrapper: `display: block; margin: 50px 0 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
+  recommend_title:   `display: block; line-height: 1.5; font-size: 20px; font-family: ${WX_FONT}; font-weight: bold; margin: 0 auto 26px; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em 6px; border-bottom: 4px solid #327848; letter-spacing: ${WX_LS};`,
+  recommend_link:    `display: block; text-decoration: none; color: ${WX_COLOR};`,
+  recommend_card:    `display: block; background-color: #f7faf8; border: 1px solid #327848; padding: 16px 20px; margin: 0 0 14px;`,
+  recommend_card_title: `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; font-weight: 600;`,
+  recommend_card_meta:  `display: block; font-size: 12px; line-height: 1.6; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #8a998f; margin-top: 8px;`,
 };
 
 function applyS(key, content, defaultTag = 'section') {
@@ -375,15 +383,34 @@ function escAttr(text) {
   return String(text || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// publishedAt 存的是 '2025-09-25 21:41:23' 或 '2025-09-25'，只取日期
+function pickDate(raw) {
+  const m = String(raw || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}.${m[2]}.${m[3]}` : '';
+}
+
 // 文末「推荐阅读」板块。cards 为空时返回空串，整个板块不出现。
-// 图片用 data URI，publishArticle 的 processHtmlImages 会自动上传到微信并换成 mmbiz 地址。
+//
+// 用纯 HTML 而不是合成图：微信正文里 <a> 包住文字同样能跳转，
+// 做成图片反而要迁就容器字库、强行裁切封面、还要过防盗链。
+// 走 HTML 的话字体字号字距天然就是正文那套。
 function buildRecommendBlock(cards) {
   if (!Array.isArray(cards) || cards.length === 0) return '';
-  // alt 是正文内容，用 escHtml（转义 & < > "）；href/src 是 URL，escAttr 转引号就够
-  const items = cards.map(c =>
-    `<a href="${escAttr(c.url)}"><img src="${escAttr(c.dataUri)}" alt="${escHtml(c.title)}" style="${S.recommend_img}"></a>`
-  ).join('');
-  return `<section style="${S.recommend_wrapper}"><section style="${S.recommend_title}">推荐阅读</section>${items}</section>`;
+
+  const items = cards.map(c => {
+    const date = pickDate(c.publishedAt);
+    const meta = date ? `<section style="${S.recommend_card_meta}">${date}</section>` : '';
+    return `<a href="${escAttr(c.url)}" style="${S.recommend_link}">`
+      + `<section style="${S.recommend_card}">`
+      + `<section style="${S.recommend_card_title}">${escHtml(c.title)}</section>`
+      + meta
+      + `</section></a>`;
+  }).join('');
+
+  return `<section style="${S.recommend_wrapper}">`
+    + `<section style="${S.recommend_title}">推荐阅读</section>`
+    + items
+    + `</section>`;
 }
 
 module.exports = { formatToWechat, buildRecommendBlock };

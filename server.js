@@ -8,7 +8,6 @@ const { formatToWechat, buildRecommendBlock } = require('./formatter');
 const { createClient }   = require('./wechat-api');
 const { recommend, extractEntities } = require('./recommender');
 const articleIndex = require('./article-index');
-const { renderCards } = require('./card-renderer');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -299,22 +298,19 @@ app.post('/api/publish', auth, async (req, res) => {
       sse.progress(2, 35, `已解析「${title}」${parsed.blocks?.length || 0} 个内容块`);
     }
 
-    // 合成推荐卡片。任何一步失败都不阻断发布，最多是没有推荐板块。
+    // 推荐阅读板块。纯 HTML，不再合成图片，所以没有下载/截图的失败面。
     let appendHtml = '';
     const ids = Array.isArray(selectedIds) ? selectedIds : [];
     if (ids.length > 0) {
-      sse.progress(3, 45, `正在合成 ${ids.length} 张推荐卡片...`);
       try {
         const pool   = db.listPublishedArticles(accountName);
+        // 按用户勾选的顺序保留，pool 里找不到的（已删除）跳过
         const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
-        const cards  = await renderCards(chosen.map(a => ({ title: a.title, url: a.url, coverUrl: a.thumbUrl })));
-        appendHtml = buildRecommendBlock(cards);
-        if (cards.length < chosen.length) {
-          sse.progress(3, 50, `${chosen.length - cards.length} 篇因封面取不到被跳过`);
-        }
+        appendHtml = buildRecommendBlock(chosen);
+        sse.progress(3, 45, `已加入 ${chosen.length} 篇推荐阅读`);
       } catch (e) {
-        console.error('[Publish] 推荐卡片合成失败，跳过该板块:', e.message);
-        sse.progress(3, 50, '推荐卡片合成失败，已跳过');
+        console.error('[Publish] 推荐板块生成失败，跳过:', e.message);
+        sse.progress(3, 45, '推荐板块生成失败，已跳过');
       }
     }
 
