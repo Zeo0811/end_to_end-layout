@@ -111,43 +111,11 @@ const S = {
   footnote_item:     `font-size: 12px; color: #555555; line-height: 1.7; margin: .3em 0; word-break: normal; overflow-wrap: break-word;`,
   footnote_num:      `color: #222222; font-weight: bold; margin-right: 4px;`,
 
-  // 文末「推荐阅读」。整段沿用正文既有的设计语言：
-  //   板块标题 = H1 的语汇（绿字 / 居中 / fit-content / 绿色下边框），
-  //              但收到 20px + 4px 边框，不与文章真正的 H1 抢层级；
-  //   每张卡片 = callout 的语汇（#f7faf8 底 + 1px 绿边），
-  //              字体字号字距全部走正文那套，不再靠截图。
+  // 文末「推荐阅读」。板块标题与文章 H1 逐项一致；
+  // 卡片本身是合成图，样式在 card-renderer.js 里。
   recommend_wrapper: `display: block; margin: 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
-  // 与文章 H1 逐字相同（S.h1），只把上边距从 80px 收到 40px ——
-  // 板块上方已有一条分隔线，再留 80px 会空一大截。
   recommend_title:   `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 40px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
-  // 链接基础样式。line-height: inherit 防止微信塞的 <span leaf=""> 撑出多余行框
-  reco_a_link:  `display: block; text-decoration: none; line-height: inherit;`,
-
-  // 封面统一裁切。宽高都写死，object-fit 万一被微信剥掉，
-  // 图会被压扁但版面不塌 —— 比高度失控好收拾。
-  // 不裁的话遇到竖版封面会撑到一屏半，三篇读者根本翻不到底。
-
-  // 方案 A · 左图右字。90×90 方图，任何比例的原图裁方损失最小。
-  // flex 万一被剥，图和字会自然堆叠，退化成方案 B 的样子，仍然可读。
-  reco_a_card:  `display: flex; align-items: center; background-color: #f7faf8; border: 1px solid #327848; padding: 14px 16px; margin: 0 0 14px;`,
-  reco_a_thumb: `width: 90px; height: 90px; max-width: 90px; display: block; flex-shrink: 0; margin-right: 14px; object-fit: cover; object-position: center;`,
-  reco_a_body:  `display: block; flex: 1; min-width: 0;`,
-
-  // 方案 B · 上图下字，白底黑字。封面全宽、固定 180px 高。
-  reco_b_card:  `display: block; background-color: #ffffff; border: 1px solid #327848; margin: 0 0 14px;`,
-  reco_b_thumb: `width: 100%; max-width: 100%; height: 180px; display: block; object-fit: cover; object-position: center;`,
-  reco_b_body:  `display: block; padding: 14px 16px; border-top: 1px solid #e6efe9;`,
-
-  // 方案 C · 上图下字，绿底白字。标题条直接用品牌绿。
-  reco_c_card:  `display: block; background-color: #327848; margin: 0 0 14px;`,
-  reco_c_thumb: `width: 100%; max-width: 100%; height: 180px; display: block; object-fit: cover; object-position: center;`,
-  reco_c_body:  `display: block; padding: 14px 16px;`,
-
-  // 标题与日期：深色底和浅色底各一套，字体字号字距全部同正文
-  reco_title_dark:  `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; font-weight: 600;`,
-  reco_title_light: `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #ffffff; font-weight: 600;`,
-  reco_meta_dark:   `display: block; font-size: 12px; line-height: 1.6; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #8a998f; margin-top: 6px;`,
-  reco_meta_light:  `display: block; font-size: 12px; line-height: 1.6; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: rgba(255,255,255,.72); margin-top: 6px;`,
+  recommend_img:     `width: 100%; max-width: 100%; height: auto; display: block; margin: 0 0 14px;`,
 };
 
 function applyS(key, content, defaultTag = 'section') {
@@ -417,58 +385,28 @@ function pickDate(raw) {
 
 // 文末「推荐阅读」板块。cards 为空时返回空串，整个板块不出现。
 //
-// 关键约束：**不能用 <a> 包块级元素**。微信编辑器不允许，会把它拆成
-// 每块一个独立的 <a>，并给每段套一个 <span leaf="">。那个 span 继承外层
-// 1.6em 行高，会在卡片里撑出一大片空白（实测绿底卡片图文之间多出约 100px）。
-// 所以这里每个文字块自带链接，图片单独一个链接，结构与微信最终形态一致。
+// 每张卡片是一张合成好的 JPEG（card-renderer.js 出的 data URI），外面套一个 <a>。
+// 这是微信唯一不会改的结构。纯 HTML 方案试过，微信会：
+//   1. 给文字链接自动加一个小图标
+//   2. 给每段套 <span leaf="">，继承行高撑出多余空白
+//   3. 强制给 <a> 加 color: rgb(51,51,51)，绿底白字被覆盖成深灰
+// 三条都没法从我们这边关掉。
 //
-// 微信还会给站内链接补 &scene=21#wechat_redirect，并给 <a> 强制加
-// color: rgb(51,51,51)。所以链接文字的颜色要写在 <a> 自己身上，
-// 靠父级继承会被覆盖。
-//
-// variant: 'a' 左图右字 | 'b' 上图下字白底 | 'c' 上图下字绿底
-function buildRecommendBlock(cards, variant = 'c') {
+// data URI 交给 publishArticle 的 processHtmlImages 自动上传并换成 mmbiz 地址。
+function buildRecommendBlock(cards) {
   if (!Array.isArray(cards) || cards.length === 0) return '';
 
-  const items = cards.map(c => {
-    const href  = escAttr(c.url);
-    const date  = pickDate(c.publishedAt);
-    const thumb = c.thumbUrl ? escAttr(c.thumbUrl) : '';
-    const title = escHtml(c.title);
-    const light = variant === 'c';
-
-    // 颜色直接写在 <a> 上：微信会给 <a> 强制加 color，父级继承挡不住
-    const titleColor = light ? '#ffffff' : WX_COLOR;
-    const metaColor  = light ? 'rgba(255,255,255,.72)' : '#8a998f';
-    const linkTitle  = `<a href="${href}" style="${S.reco_a_link} color: ${titleColor}; font-weight: 600;">${title}</a>`;
-    const linkDate   = date
-      ? `<a href="${href}" style="${S.reco_a_link} color: ${metaColor};">${date}</a>`
-      : '';
-
-    const textBlock =
-      `<section style="${light ? S.reco_title_light : S.reco_title_dark}">${linkTitle}</section>`
-      + (date ? `<section style="${light ? S.reco_meta_light : S.reco_meta_dark}">${linkDate}</section>` : '');
-
-    const imgTag = (style) => thumb
-      ? `<a href="${href}" style="${S.reco_a_link}"><img src="${thumb}" alt="" style="${style}"></a>`
-      : '';
-
-    if (variant === 'a') {
-      return `<section style="${S.reco_a_card}">${imgTag(S.reco_a_thumb)}`
-        + `<section style="${S.reco_a_body}">${textBlock}</section></section>`;
-    }
-    if (variant === 'b') {
-      return `<section style="${S.reco_b_card}">${imgTag(S.reco_b_thumb)}`
-        + `<section style="${S.reco_b_body}">${textBlock}</section></section>`;
-    }
-    return `<section style="${S.reco_c_card}">${imgTag(S.reco_c_thumb)}`
-      + `<section style="${S.reco_c_body}">${textBlock}</section></section>`;
-  }).join('');
+  const items = cards.map(c =>
+    `<a href="${escAttr(c.url)}">`
+    + `<img src="${escAttr(c.dataUri)}" alt="${escHtml(c.title)}" style="${S.recommend_img}">`
+    + `</a>`
+  ).join('');
 
   return `<section style="${S.recommend_wrapper}">`
     + `<section style="${S.recommend_title}">推荐阅读</section>`
     + items
     + `</section>`;
 }
+
 
 module.exports = { formatToWechat, buildRecommendBlock };
