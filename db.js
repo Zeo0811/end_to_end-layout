@@ -4,9 +4,23 @@ const Database = require('better-sqlite3');
 const crypto   = require('crypto');
 const path     = require('path');
 
+const fs = require('fs');
+
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'data.db');
+
+// 挂载卷的目录若不存在，better-sqlite3 会直接抛错。先建出来。
+const dbDir = path.dirname(dbPath);
+if (dbDir && dbDir !== '.' && !fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
+
+// 把真实路径打出来。Railway 上没挂卷时数据库落在容器里，每次部署清零，
+// 但表会自动重建、admin 会自动种回，从界面上完全看不出来数据丢了。
+// 启动日志里的这一行是唯一能确认卷挂载成功的证据。
+console.log(`[DB] 数据库位置: ${path.resolve(dbPath)}${process.env.DATABASE_PATH ? '' : '（未设 DATABASE_PATH，部署后数据会丢失）'}`);
 
 // ── 建表 ──
 db.exec(`
