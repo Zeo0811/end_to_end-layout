@@ -366,3 +366,29 @@ test('syncAccount: 多图文里的每一篇都入库，不只头条', async () =
   const titles = db.listPublishedArticles(acc).map(x => x.title).sort();
   assert.deepStrictEqual(titles, ['三条：聊聊 Devin', '头条：聊聊 Cursor', '次条：聊聊 Manus'].sort());
 });
+
+// ── 导入接口用到的幂等语义 ──
+
+test('upsertArticle: 导入同一 url 两次只有一行，且内容被更新', () => {
+  const acc = '导入号';
+  const one = { accountName: acc, url: 'https://mp.weixin.qq.com/s?__biz=A&sn=x',
+                title: '初版标题', thumbUrl: 'https://img/1.jpg', status: 'published',
+                bodyText: '初版正文', summaryText: '初版标题 初版正文', publishedAt: '2026-01-01' };
+  const id1 = db.upsertArticle(one);
+  const id2 = db.upsertArticle({ ...one, title: '修订标题', bodyText: '修订正文' });
+  assert.strictEqual(id1, id2, '同 url 必须复用同一行');
+  const rows = db.listPublishedArticles(acc);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].title, '修订标题');
+});
+
+test('upsertArticle: 导入的文章带封面和链接时计入 usable', () => {
+  const acc = '导入可用号';
+  db.upsertArticle({ accountName: acc, url: 'https://mp/i1', title: '有封面',
+                     thumbUrl: 'https://img/a.jpg', status: 'published' });
+  db.upsertArticle({ accountName: acc, url: 'https://mp/i2', title: '无封面',
+                     thumbUrl: '', status: 'published' });
+  const s = db.getIndexStats(acc);
+  assert.strictEqual(s.published, 2);
+  assert.strictEqual(s.usable, 1, '没封面的不算可推荐');
+});

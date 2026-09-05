@@ -21,6 +21,20 @@ const STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'that', 'this', 'you', 'are',
   'llm', 'agent', 'gpt', 'model', 'chat', 'pro', 'max', 'plus',
   'ceo', 'cto', 'ui', 'ux', 'sdk', 'saas', 'pc', 'vr', 'ar',
+  // 英文虚词。正文里到处都是，一旦某篇密度稍高就会把不相干的文章连起来。
+  // （实测：「机器人在日本火了」曾靠 all / above 连上「Apple 收割者」）
+  'all', 'above', 'about', 'after', 'again', 'also', 'any', 'are', 'been',
+  'before', 'best', 'but', 'can', 'from', 'get', 'has', 'have', 'her',
+  'his', 'how', 'into', 'its', 'just', 'like', 'made', 'make', 'more',
+  'most', 'new', 'not', 'now', 'one', 'only', 'our', 'out', 'over',
+  'said', 'see', 'she', 'some', 'than', 'them', 'then', 'there', 'they',
+  'time', 'two', 'use', 'very', 'was', 'way', 'were', 'what', 'when',
+  'where', 'which', 'who', 'why', 'will', 'with', 'would', 'you', 'your',
+  // 泛技术词。是话题不是对象，命中它们不代表讲了同一件事。
+  'vision', 'data', 'cloud', 'code', 'coding', 'agents', 'agentic',
+  'prompt', 'token', 'tokens', 'demo', 'beta', 'alpha', 'team', 'tech',
+  'video', 'audio', 'image', 'text', 'chatbot', 'copilot', 'assistant',
+  'startup', 'vc', 'ipo', 'saas', 'api', 'gpu', 'cpu', 'chip',
 ]);
 
 module.exports = { DICT, STOPWORDS };
