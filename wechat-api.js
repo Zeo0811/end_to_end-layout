@@ -315,6 +315,22 @@ function createClient(appId, appSecret) {
     return { media_id: mediaId };
   }
 
+  // 把草稿箱里那篇的正文原样取回来。用于排查微信到底剥掉了哪些样式 ——
+  // 我们发过去的 HTML 和微信存下来的 HTML 一 diff 就清楚了，不用猜。
+  async function getDraft(mediaId) {
+    return apiCallWithRetry(async () => {
+      const token = await getAccessToken();
+      const url   = `https://api.weixin.qq.com/cgi-bin/draft/get?access_token=${token}`;
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ media_id: mediaId }),
+      });
+      const data = await res.json();
+      if (data.errcode) throw new Error(`读取草稿失败: [${data.errcode}] ${data.errmsg}`);
+      return data;
+    });
+  }
+
   async function deleteDraft(mediaId) {
     return apiCallWithRetry(async () => {
       const token = await getAccessToken();
@@ -386,6 +402,7 @@ function createClient(appId, appSecret) {
     uploadPermanentImage,
     uploadVideo,
     createDraft,
+    getDraft,
     deleteDraft,
     processHtmlImages,
     processHtmlVideos,

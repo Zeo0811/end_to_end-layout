@@ -517,6 +517,21 @@ app.get('/api/pending-articles', auth, (req, res) => {
   res.json({ rows: db.listPendingArticles(accountName) });
 });
 
+// 取回草稿正文。排查微信剥掉了哪些样式时用：
+// 把我们发过去的 HTML 和这里返回的一 diff 就知道了。
+app.post('/api/draft-html', auth, async (req, res) => {
+  const { accountName, mediaId } = req.body;
+  if (!accountName || !mediaId) return res.status(400).json({ error: '缺少 accountName 或 mediaId' });
+  try {
+    const client = getWechatClient(accountName);
+    const data   = await client.getDraft(mediaId);
+    const item   = (data.news_item || [])[0] || {};
+    res.json({ title: item.title || '', content: item.content || '' });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // 接口权限诊断：把微信那边的真实情况打出来，避免靠猜。
 app.post('/api/probe-wechat', auth, async (req, res) => {
   const { accountName } = req.body;
