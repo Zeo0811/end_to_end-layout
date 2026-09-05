@@ -9,6 +9,8 @@ const CARDS = [
   { title: '文章二', url: 'https://mp.weixin.qq.com/s?__biz=A&sn=2', publishedAt: '2026-08-14' },
 ];
 
+const CARDS_WITH_COVER = CARDS.map((c, i) => ({ ...c, thumbUrl: `https://mmbiz.qpic.cn/cover${i}/640?wx_fmt=jpeg` }));
+
 test('formatToWechat: 不传 options 时行为不变', () => {
   const html = formatToWechat(PARSED);
   assert.ok(html.startsWith('<section style="'));
@@ -38,10 +40,21 @@ test('buildRecommendBlock: 每篇一个指向 mp 的链接', () => {
   assert.ok(html.includes('文章二'));
 });
 
-test('buildRecommendBlock: 不再产出图片，改为纯 HTML', () => {
+test('buildRecommendBlock: 封面用原图直连，不再内嵌合成图', () => {
+  const html = buildRecommendBlock(CARDS_WITH_COVER);
+  assert.ok(html.includes('src="https://mmbiz'), '封面应直连原图，由 processHtmlImages 转存');
+  assert.ok(!html.includes('data:image'), '不应再有内嵌合成图');
+});
+
+test('buildRecommendBlock: 没有封面时不渲染 img', () => {
   const html = buildRecommendBlock(CARDS);
-  assert.ok(!html.includes('<img'), '不应再有 img 标签');
-  assert.ok(!html.includes('data:image'), '不应再有内嵌图片');
+  assert.ok(!html.includes('<img'), '没封面就不该有 img 标签');
+});
+
+test('buildRecommendBlock: 三个方案的封面尺寸都写死，避免高度失控', () => {
+  assert.ok(buildRecommendBlock(CARDS_WITH_COVER, 'a').includes('width: 90px; height: 90px'), 'A 是方图');
+  assert.ok(buildRecommendBlock(CARDS_WITH_COVER, 'b').includes('height: 180px'), 'B 固定高');
+  assert.ok(buildRecommendBlock(CARDS_WITH_COVER, 'c').includes('height: 180px'), 'C 固定高');
 });
 
 test('buildRecommendBlock: 日期取到天，格式 YYYY.MM.DD', () => {
@@ -67,7 +80,7 @@ test('buildRecommendBlock: 标题被转义', () => {
 });
 
 test('buildRecommendBlock: 字体字号字距与正文一致', () => {
-  const html = buildRecommendBlock(CARDS);
+  const html = buildRecommendBlock(CARDS, 'a');
   assert.ok(html.includes('mp-quote'), '必须用正文字体栈');
   assert.ok(html.includes('font-size: 15px'), '卡片标题用正文字号');
   assert.ok(html.includes('letter-spacing: 0.034em'), '字距与正文一致');
@@ -81,8 +94,14 @@ test('buildRecommendBlock: 板块标题沿用 H1 语汇但不抢层级', () => {
   assert.ok(!html.includes('border-bottom: 8px'), '8px 是文章 H1 的，不能占用');
 });
 
-test('buildRecommendBlock: 卡片沿用 callout 语汇', () => {
-  const html = buildRecommendBlock(CARDS);
+test('buildRecommendBlock: 方案 A 沿用 callout 语汇', () => {
+  const html = buildRecommendBlock(CARDS, 'a');
   assert.ok(html.includes('#f7faf8'), 'callout 底色');
   assert.ok(html.includes('border: 1px solid #327848'), 'callout 绿边');
+});
+
+test('buildRecommendBlock: 默认方案 C —— 绿底白字', () => {
+  const html = buildRecommendBlock(CARDS);
+  assert.ok(html.includes('background-color: #327848'), '标题条用品牌绿');
+  assert.ok(html.includes('color: #ffffff'), '标题用白字');
 });

@@ -95,7 +95,8 @@ test('管线：召回结果直接落进正文 wrapper 之内', () => {
   // db 出来的 publishedAt 一路传到日期行
   assert.ok(html.includes('2026.01.01'), '日期应渲染出来');
   // 纯 HTML，不再有图片
-  assert.ok(!html.includes('<img'), '不应再合成图片');
+  // 封面直连原图，由 processHtmlImages 转存到 mmbiz，不再内嵌合成图
+  assert.ok(!html.includes('data:image'), '不应再有内嵌合成图');
 });
 
 test('管线：一篇都没选时正文与改造前完全一致', () => {

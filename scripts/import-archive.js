@@ -38,8 +38,10 @@ function parseArgs(argv) {
 
 // 存档链接带 scene / sessionid 等跟踪参数，每次导出都不同。
 // 不清掉的话同一篇会因 url 不同被当成两篇，幂等失效。
-// 永久定位只需要这几个参数。
-const KEEP_PARAMS = ['__biz', 'mid', 'idx', 'sn'];
+//
+// chksm 必须保留 —— 实测去掉它，mp 只返回一段 JS 壳（3.5KB），
+// 拿不到正文；带上才是完整页面。它是内容校验码，不是跟踪参数。
+const KEEP_PARAMS = ['__biz', 'mid', 'idx', 'sn', 'chksm'];
 
 function canonicalUrl(raw) {
   try {

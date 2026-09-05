@@ -330,6 +330,14 @@ function findPendingByTitle(accountName, title) {
   `).get(accountName, title);
 }
 
+function listPendingArticles(accountName) {
+  return db.prepare(`
+    SELECT id, title, media_id AS mediaId, source_url AS sourceUrl, created_at AS createdAt
+    FROM articles WHERE account_name = ? AND status = 'pending'
+    ORDER BY id DESC
+  `).all(accountName);
+}
+
 function getIndexStats(accountName) {
   const row = db.prepare(`
     SELECT
@@ -386,6 +394,7 @@ module.exports = {
   getEntityDocFreq,
   findPendingByTitle,
   getIndexStats,
+  listPendingArticles,
   setSyncMeta,
   getSyncMeta,
 };

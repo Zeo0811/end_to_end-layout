@@ -8,6 +8,7 @@ const { formatToWechat, buildRecommendBlock } = require('./formatter');
 const { createClient }   = require('./wechat-api');
 const { recommend, extractEntities } = require('./recommender');
 const articleIndex = require('./article-index');
+const mpArticle    = require('./mp-article');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -417,6 +418,60 @@ app.post('/api/import-articles', auth, (req, res) => {
     ok: true, imported, skipped, failed: errors.length,
     errors: errors.slice(0, 5), stats: db.getIndexStats(accountName),
   });
+});
+
+// 贴一条已群发的文章链接，自动抓标题/封面/发布时间/正文并入库。
+//
+// 个人主体的公众号没有「发布能力」接口权限（48001），freepublish 读不到
+// 已发布列表，所以增量只能这样补：在微信后台群发后把链接贴回来。
+// 命中同标题的 pending 记录就回填（保留 crawler 抽出的高质量正文），
+// 否则作为新文章插入。按 url 幂等，重复贴同一条不会产生重复行。
+app.post('/api/add-article', auth, async (req, res) => {
+  const { accountName, url } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  if (!url)         return res.status(400).json({ error: '请提供文章链接' });
+
+  try {
+    const a = await mpArticle.fetchArticle(url);
+    const pending = db.findPendingByTitle(accountName, a.title);
+
+    const id = db.upsertArticle({
+      id: pending ? pending.id : undefined,   // 回填必须指定行，否则按空 url 查不到会误插
+      accountName,
+      title:       a.title,
+      digest:      a.digest || '',
+      url:         a.url,
+      thumbUrl:    a.thumbUrl || '',
+      sourceUrl:   pending ? pending.source_url : '',
+      mediaId:     pending ? pending.media_id  : '',
+      status:      'published',
+      bodyText:    a.bodyText,
+      summaryText: articleIndex.makeSummary(a.title, a.bodyText),
+      publishedAt: a.publishedAt || '',
+    });
+
+    // 命中 pending 时保留原有实体：那是 crawler 从源文档抽的，比从
+    // 微信 HTML 反解的准。没命中才重新抽。
+    if (!pending) db.setArticleEntities(id, extractEntities(a.title, a.bodyText));
+
+    console.log(`[AddArticle] ${accountName} ${pending ? '回填' : '新增'}「${a.title}」`);
+    res.json({
+      ok: true,
+      mode: pending ? 'backfilled' : 'added',
+      article: { id, title: a.title, url: a.url, thumbUrl: a.thumbUrl, publishedAt: a.publishedAt },
+      stats: db.getIndexStats(accountName),
+    });
+  } catch (e) {
+    console.error('[AddArticle] 失败:', e.message);
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// 待回填列表：经 zeooo.cc 发过草稿、但还没拿到永久链接的文章
+app.get('/api/pending-articles', auth, (req, res) => {
+  const accountName = req.query.accountName;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  res.json({ rows: db.listPendingArticles(accountName) });
 });
 
 // 接口权限诊断：把微信那边的真实情况打出来，避免靠猜。

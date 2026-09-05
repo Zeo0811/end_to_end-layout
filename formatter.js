@@ -119,9 +119,32 @@ const S = {
   recommend_wrapper: `display: block; margin: 50px 0 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
   recommend_title:   `display: block; line-height: 1.5; font-size: 20px; font-family: ${WX_FONT}; font-weight: bold; margin: 0 auto 26px; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em 6px; border-bottom: 4px solid #327848; letter-spacing: ${WX_LS};`,
   recommend_link:    `display: block; text-decoration: none; color: ${WX_COLOR};`,
-  recommend_card:    `display: block; background-color: #f7faf8; border: 1px solid #327848; padding: 16px 20px; margin: 0 0 14px;`,
-  recommend_card_title: `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; font-weight: 600;`,
-  recommend_card_meta:  `display: block; font-size: 12px; line-height: 1.6; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #8a998f; margin-top: 8px;`,
+
+  // 封面统一裁切。宽高都写死，object-fit 万一被微信剥掉，
+  // 图会被压扁但版面不塌 —— 比高度失控好收拾。
+  // 不裁的话遇到竖版封面会撑到一屏半，三篇读者根本翻不到底。
+
+  // 方案 A · 左图右字。90×90 方图，任何比例的原图裁方损失最小。
+  // flex 万一被剥，图和字会自然堆叠，退化成方案 B 的样子，仍然可读。
+  reco_a_card:  `display: flex; align-items: center; background-color: #f7faf8; border: 1px solid #327848; padding: 14px 16px; margin: 0 0 14px;`,
+  reco_a_thumb: `width: 90px; height: 90px; max-width: 90px; display: block; flex-shrink: 0; margin-right: 14px; object-fit: cover; object-position: center;`,
+  reco_a_body:  `display: block; flex: 1; min-width: 0;`,
+
+  // 方案 B · 上图下字，白底黑字。封面全宽、固定 180px 高。
+  reco_b_card:  `display: block; background-color: #ffffff; border: 1px solid #327848; margin: 0 0 14px;`,
+  reco_b_thumb: `width: 100%; max-width: 100%; height: 180px; display: block; object-fit: cover; object-position: center;`,
+  reco_b_body:  `display: block; padding: 14px 16px; border-top: 1px solid #e6efe9;`,
+
+  // 方案 C · 上图下字，绿底白字。标题条直接用品牌绿。
+  reco_c_card:  `display: block; background-color: #327848; margin: 0 0 14px;`,
+  reco_c_thumb: `width: 100%; max-width: 100%; height: 180px; display: block; object-fit: cover; object-position: center;`,
+  reco_c_body:  `display: block; padding: 14px 16px;`,
+
+  // 标题与日期：深色底和浅色底各一套，字体字号字距全部同正文
+  reco_title_dark:  `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; font-weight: 600;`,
+  reco_title_light: `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #ffffff; font-weight: 600;`,
+  reco_meta_dark:   `display: block; font-size: 12px; line-height: 1.6; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #8a998f; margin-top: 6px;`,
+  reco_meta_light:  `display: block; font-size: 12px; line-height: 1.6; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: rgba(255,255,255,.72); margin-top: 6px;`,
 };
 
 function applyS(key, content, defaultTag = 'section') {
@@ -393,18 +416,35 @@ function pickDate(raw) {
 //
 // 用纯 HTML 而不是合成图：微信正文里 <a> 包住文字同样能跳转，
 // 做成图片反而要迁就容器字库、强行裁切封面、还要过防盗链。
-// 走 HTML 的话字体字号字距天然就是正文那套。
-function buildRecommendBlock(cards) {
+// 封面用 <img> 直连原图，publishArticle 的 processHtmlImages
+// 会自动下载并转存到 mmbiz，防盗链在服务端就解决了。
+//
+// variant: 'a' 左图右字 | 'b' 上图下字白底 | 'c' 上图下字绿底
+function buildRecommendBlock(cards, variant = 'c') {
   if (!Array.isArray(cards) || cards.length === 0) return '';
 
   const items = cards.map(c => {
-    const date = pickDate(c.publishedAt);
-    const meta = date ? `<section style="${S.recommend_card_meta}">${date}</section>` : '';
-    return `<a href="${escAttr(c.url)}" style="${S.recommend_link}">`
-      + `<section style="${S.recommend_card}">`
-      + `<section style="${S.recommend_card_title}">${escHtml(c.title)}</section>`
-      + meta
-      + `</section></a>`;
+    const date  = pickDate(c.publishedAt);
+    const thumb = c.thumbUrl ? escAttr(c.thumbUrl) : '';
+    const title = escHtml(c.title);
+    const light = variant === 'c';
+    const titleS = light ? S.reco_title_light : S.reco_title_dark;
+    const metaS  = light ? S.reco_meta_light  : S.reco_meta_dark;
+    const meta   = date ? `<section style="${metaS}">${date}</section>` : '';
+    const text   = `<section style="${titleS}">${title}</section>${meta}`;
+
+    let inner;
+    if (variant === 'a') {
+      const img = thumb ? `<img src="${thumb}" alt="" style="${S.reco_a_thumb}">` : '';
+      inner = `<section style="${S.reco_a_card}">${img}<section style="${S.reco_a_body}">${text}</section></section>`;
+    } else if (variant === 'b') {
+      const img = thumb ? `<img src="${thumb}" alt="" style="${S.reco_b_thumb}">` : '';
+      inner = `<section style="${S.reco_b_card}">${img}<section style="${S.reco_b_body}">${text}</section></section>`;
+    } else {
+      const img = thumb ? `<img src="${thumb}" alt="" style="${S.reco_c_thumb}">` : '';
+      inner = `<section style="${S.reco_c_card}">${img}<section style="${S.reco_c_body}">${text}</section></section>`;
+    }
+    return `<a href="${escAttr(c.url)}" style="${S.recommend_link}">${inner}</a>`;
   }).join('');
 
   return `<section style="${S.recommend_wrapper}">`
