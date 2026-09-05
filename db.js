@@ -330,6 +330,10 @@ function findPendingByTitle(accountName, title) {
   `).get(accountName, title);
 }
 
+function findArticleByUrl(url) {
+  return db.prepare('SELECT id, title, status, published_at AS publishedAt FROM articles WHERE url = ?').get(url);
+}
+
 function listPendingArticles(accountName) {
   return db.prepare(`
     SELECT id, title, media_id AS mediaId, source_url AS sourceUrl, created_at AS createdAt
@@ -395,6 +399,7 @@ module.exports = {
   findPendingByTitle,
   getIndexStats,
   listPendingArticles,
+  findArticleByUrl,
   setSyncMeta,
   getSyncMeta,
 };

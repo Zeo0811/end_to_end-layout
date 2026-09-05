@@ -90,6 +90,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// 所有 JSON 响应统一带上 ok，按 HTTP 状态码判定。
+// 失败时原先只返回 { error }，调用方要分两种形状解析；现在
+// 成功一律 ok:true、失败一律 ok:false + error，且以后新加的接口自动生效。
+// SSE 走 res.write，不经过这里，它们的 done 事件本来就带 ok。
+app.use((req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (body && typeof body === 'object' && !Array.isArray(body) && !('ok' in body)) {
+      return json({ ok: res.statusCode < 400, ...body });
+    }
+    return json(body);
+  };
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -432,7 +447,35 @@ app.post('/api/add-article', auth, async (req, res) => {
   if (!url)         return res.status(400).json({ error: '请提供文章链接' });
 
   try {
+    // 先按归一化后的 url 查重，避免同一篇被反复抓取。
+    // 早退在 fetch 之前：命中就不用再拉 3.5MB 的页面。
+    const canon = mpArticle.canonicalUrl(url);
+    if (canon) {
+      const dup = db.findArticleByUrl(canon);
+      if (dup) {
+        return res.status(409).json({
+          ok: false, mode: 'duplicate',
+          error: `这篇已在库中：「${dup.title}」`,
+          article: { id: dup.id, title: dup.title, url: canon, publishedAt: dup.publishedAt, status: dup.status },
+          stats: db.getIndexStats(accountName),
+        });
+      }
+    }
+
     const a = await mpArticle.fetchArticle(url);
+
+    // 抓完再查一次：链接归一化不了（缺 chksm 等）时上面那道没生效，
+    // 而 fetchArticle 返回的 url 一定是规范化过的
+    const dup2 = db.findArticleByUrl(a.url);
+    if (dup2) {
+      return res.status(409).json({
+        ok: false, mode: 'duplicate',
+        error: `这篇已在库中：「${dup2.title}」`,
+        article: { id: dup2.id, title: dup2.title, url: a.url, publishedAt: dup2.publishedAt, status: dup2.status },
+        stats: db.getIndexStats(accountName),
+      });
+    }
+
     const pending = db.findPendingByTitle(accountName, a.title);
 
     const id = db.upsertArticle({
