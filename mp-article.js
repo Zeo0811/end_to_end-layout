@@ -19,15 +19,24 @@ function canonicalUrl(raw) {
   if (!/^https?:\/\/mp\.weixin\.qq\.com\/s/.test(trimmed)) return null;
   try {
     const u = new URL(trimmed);
+
+    // 短链 /s/<hash>：从微信「复制链接」拿到的就是这种，也是最常见的形式。
+    // 它本身已经是永久规范链接，不带参数、也不需要 chksm，
+    // 去掉 ?from=... 这类跟踪参数即可。
+    const short = u.pathname.match(/^\/s\/([A-Za-z0-9_-]{8,})$/);
+    if (short) return `https://mp.weixin.qq.com/s/${short[1]}`;
+
+    // 长链 /s?__biz=...：存档导出和后台复制常见这种
     const kept = [];
     for (const k of KEEP_PARAMS) {
       const v = u.searchParams.get(k);
       // 不用 URLSearchParams.toString()：它会把 __biz 末尾的 == 编码成 %3D%3D，
-      // 微信认不出来，会 302 到「未知错误」页
+      // 微信认不出来会 302 到「未知错误」页
       if (v) kept.push(`${k}=${v}`);
     }
-    if (!kept.length) return null;
-    return `https://mp.weixin.qq.com/s?${kept.join('&')}`;
+    if (kept.length) return `https://mp.weixin.qq.com/s?${kept.join('&')}`;
+
+    return null;
   } catch {
     return null;
   }
@@ -82,7 +91,8 @@ function parseArticlePage(html) {
 
 async function fetchArticle(rawUrl) {
   const url = canonicalUrl(rawUrl);
-  if (!url) throw new Error('不是有效的公众号文章链接（需要 mp.weixin.qq.com/s?... 形式）');
+  if (!url) throw new Error('不是有效的公众号文章链接。支持两种形式：'
+    + 'https://mp.weixin.qq.com/s/xxxxx 或 https://mp.weixin.qq.com/s?__biz=...&sn=...');
 
   const res = await fetch(url, {
     headers: { 'User-Agent': UA },

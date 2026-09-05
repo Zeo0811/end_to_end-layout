@@ -67,3 +67,41 @@ test('htmlToText: 剥标签、解实体、压空白', () => {
   assert.ok(!t.includes('var a=1'));
   assert.ok(!t.includes('<'));
 });
+
+// ── 短链 /s/<hash> ──
+// 从微信「复制链接」拿到的就是这种，也是最常见的形式。
+// 早先 canonicalUrl 只认长链，短链因为没有查询参数被直接判无效。
+
+test('canonicalUrl: 短链原样保留', () => {
+  const u = 'https://mp.weixin.qq.com/s/iDE0Dj5xsiHAebhFIqjEZg';
+  assert.strictEqual(canonicalUrl(u), u);
+});
+
+test('canonicalUrl: 短链的跟踪参数和锚点被清掉', () => {
+  const want = 'https://mp.weixin.qq.com/s/iDE0Dj5xsiHAebhFIqjEZg';
+  assert.strictEqual(canonicalUrl(want + '?from=timeline&isappinstalled=0'), want);
+  assert.strictEqual(canonicalUrl(want + '#rd'), want);
+  assert.strictEqual(canonicalUrl(want + '?from=groupmessage#rd'), want);
+});
+
+test('canonicalUrl: 同一篇短链的不同分享形式归一到同一个 url', () => {
+  const base = 'https://mp.weixin.qq.com/s/AbCdEf123456';
+  assert.strictEqual(canonicalUrl(base + '?from=timeline'), canonicalUrl(base + '?from=singlemessage'));
+});
+
+test('canonicalUrl: 短链不需要 chksm（它本身就是永久规范链接）', () => {
+  const out = canonicalUrl('https://mp.weixin.qq.com/s/iDE0Dj5xsiHAebhFIqjEZg');
+  assert.ok(out);
+  assert.ok(!out.includes('chksm'), '短链不该被要求带 chksm');
+});
+
+test('canonicalUrl: 长链仍然照常工作', () => {
+  const out = canonicalUrl('https://mp.weixin.qq.com/s?__biz=MzAx==&mid=1&idx=1&sn=abc&chksm=d&scene=126');
+  assert.ok(out.includes('__biz=MzAx=='));
+  assert.ok(out.includes('chksm=d'));
+  assert.ok(!out.includes('scene='));
+});
+
+test('canonicalUrl: 路径像短链但太短的不认', () => {
+  assert.strictEqual(canonicalUrl('https://mp.weixin.qq.com/s/abc'), null);
+});

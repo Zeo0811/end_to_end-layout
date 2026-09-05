@@ -73,11 +73,12 @@ test('缺参数带 ok:false', async () => {
   assert.match(body.error, /链接/);
 });
 
-test('add-article: 链接格式不对时带 ok:false 和可读的原因', async () => {
+test('add-article: 链接格式不对时带 ok:false，并说明支持哪两种形式', async () => {
   const { status, body } = await post('/api/add-article', { accountName: '测试号', url: 'https://example.com/a' }, auth());
   assert.strictEqual(status, 400);
   assert.strictEqual(body.ok, false);
   assert.match(body.error, /公众号文章链接/);
+  assert.match(body.error, /\/s\//, '错误提示要告诉用户短链也支持');
 });
 
 test('GET 类接口也补上 ok:true', async () => {
