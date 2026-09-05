@@ -122,6 +122,20 @@ function auth(req, res, next) {
   next();
 }
 
+// 插件专用只读凭证。给 Chrome 插件用，避免把账号密码存进 chrome.storage。
+// 只对推荐相关的两个只读路由生效，拿不到发布、删草稿、账号管理。
+// 未配置 EXTENSION_API_KEY 时这条通道整个关闭，只能走正常登录。
+const EXTENSION_API_KEY = (process.env.EXTENSION_API_KEY || '').trim();
+
+function authOrKey(req, res, next) {
+  const key = req.headers['x-extension-key'];
+  if (EXTENSION_API_KEY && key === EXTENSION_API_KEY) {
+    req.user = { id: 0, username: 'extension', role: 'extension' };
+    return next();
+  }
+  return auth(req, res, next);   // 没带 key 就按正常登录判
+}
+
 function adminOnly(req, res, next) {
   if (req.user.role !== 'admin') return res.status(403).json({ error: '需要管理员权限' });
   next();
@@ -176,7 +190,7 @@ app.delete('/api/users/:username', auth, adminOnly, (req, res) => {
 
 // ── 账号管理（管理员）──
 
-app.get('/api/accounts', auth, (req, res) => {
+app.get('/api/accounts', authOrKey, (req, res) => {
   res.json({ accounts: db.getAccounts() });
 });
 
@@ -534,7 +548,7 @@ app.get('/api/pending-articles', auth, (req, res) => {
 // 也不能用 /api/publish —— 那条最后会建微信草稿，插件只是要一段 HTML。
 
 // 算推荐候选。纯计算，不碰浏览器，毫秒级。
-app.post('/api/recommend', auth, (req, res) => {
+app.post('/api/recommend', authOrKey, (req, res) => {
   const { accountName, title, bodyText } = req.body;
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
   if (!title)       return res.status(400).json({ error: '缺少文章标题' });
@@ -564,7 +578,7 @@ app.post('/api/recommend', auth, (req, res) => {
 // 合成卡片并返回可直接拼到正文末尾的 HTML。
 // 插件不用懂排版，以后改样式也不用动插件。
 // 会下载封面 + 无头浏览器截图，每张卡片一两秒。
-app.post('/api/recommend-html', auth, async (req, res) => {
+app.post('/api/recommend-html', authOrKey, async (req, res) => {
   const { accountName, selectedIds } = req.body;
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
   const ids = Array.isArray(selectedIds) ? selectedIds : [];

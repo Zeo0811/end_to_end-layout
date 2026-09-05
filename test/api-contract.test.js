@@ -16,7 +16,8 @@ let child, token;
 
 before(async () => {
   child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: tmpDb, WECHAT_ACCOUNTS: '' },
+    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: tmpDb, WECHAT_ACCOUNTS: '',
+           EXTENSION_API_KEY: 'test-key-abc123' },
     stdio: 'ignore',
   });
   // 等端口起来，最多 20 秒
@@ -205,5 +206,47 @@ test('recommend-html: 超过 8 篇带 ok:false', async () => {
   const { status, body } = await post('/api/recommend-html',
     { accountName: 'x', selectedIds: [1,2,3,4,5,6,7,8,9] }, auth());
   assert.strictEqual(status, 400);
+  assert.strictEqual(body.ok, false);
+});
+
+
+// ── 插件专用 key ──
+
+const keyHdr = () => ({ 'Content-Type': 'application/json', 'X-Extension-Key': 'test-key-abc123' });
+
+test('插件 key 能调推荐路由，不需要登录', async () => {
+  const { status, body } = await post('/api/recommend',
+    { accountName: '钥匙号', title: 'Cursor 实测', bodyText: '讲 Cursor' }, keyHdr());
+  assert.strictEqual(status, 200);
+  assert.strictEqual(body.ok, true);
+  assert.ok(Array.isArray(body.candidates));
+});
+
+test('插件 key 能拉账号列表（面板要选公众号）', async () => {
+  const r = await fetch(BASE + '/api/accounts', { headers: { 'X-Extension-Key': 'test-key-abc123' } });
+  const body = await r.json();
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(body.ok, true);
+  assert.ok(Array.isArray(body.accounts));
+});
+
+test('插件 key 拿不到发布相关的路由', async () => {
+  for (const p of ['/api/publish', '/api/add-article', '/api/sync-articles', '/api/import-articles']) {
+    const { status, body } = await post(p, {}, keyHdr());
+    assert.strictEqual(status, 401, `${p} 不该对插件 key 开放`);
+    assert.strictEqual(body.ok, false);
+  }
+});
+
+test('插件 key 拿不到管理员路由', async () => {
+  const r = await fetch(BASE + '/api/users', { headers: { 'X-Extension-Key': 'test-key-abc123' } });
+  assert.strictEqual(r.status, 401);
+});
+
+test('错误的 key 被拒', async () => {
+  const { status, body } = await post('/api/recommend',
+    { accountName: 'x', title: 'y' },
+    { 'Content-Type': 'application/json', 'X-Extension-Key': 'wrong-key' });
+  assert.strictEqual(status, 401);
   assert.strictEqual(body.ok, false);
 });
