@@ -541,6 +541,21 @@ app.get('/api/pending-articles', auth, (req, res) => {
   res.json({ rows: db.listPendingArticles(accountName) });
 });
 
+// 一次性维护：把历史遗留的 %3D%3D 编码 URL 改回 ==。
+// 那种链接微信会 302 到错误页，卡片点不开。
+app.post('/api/fix-urls', auth, (req, res) => {
+  const { accountName } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  try {
+    const r = db.fixEncodedUrls(accountName);
+    console.log(`[FixUrls] ${accountName} 扫描 ${r.scanned} 条，修正 ${r.fixed}，合并 ${r.merged}`);
+    res.json({ ...r, stats: db.getIndexStats(accountName) });
+  } catch (e) {
+    console.error('[FixUrls] 失败:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── 给 Chrome 插件用的两个薄路由 ──
 //
 // 插件的正文是它自己在 Notion/飞书 页面上解析好的，没有 crawl 阶段，

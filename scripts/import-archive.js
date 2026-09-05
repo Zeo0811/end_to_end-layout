@@ -46,13 +46,19 @@ const KEEP_PARAMS = ['__biz', 'mid', 'idx', 'sn', 'chksm'];
 function canonicalUrl(raw) {
   try {
     const u = new URL(raw.replace(/&amp;/g, '&'));
-    const kept = new URLSearchParams();
+    const kept = [];
+    let biz = '', sn = '';
     for (const k of KEEP_PARAMS) {
       const v = u.searchParams.get(k);
-      if (v) kept.set(k, v);
+      if (!v) continue;
+      if (k === '__biz') biz = v;
+      if (k === 'sn')    sn  = v;
+      // 不能用 URLSearchParams.toString()：它会把 __biz 末尾的 == 编码成
+      // %3D%3D，微信认不出来会 302 到「未知错误」页，卡片链接就点不开了
+      kept.push(`${k}=${v}`);
     }
-    if (!kept.get('__biz') || !kept.get('sn')) return null;
-    return `https://mp.weixin.qq.com/s?${kept.toString()}`;
+    if (!biz || !sn) return null;
+    return `https://mp.weixin.qq.com/s?${kept.join('&')}`;
   } catch {
     return null;
   }

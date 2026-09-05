@@ -330,6 +330,32 @@ function findPendingByTitle(accountName, title) {
   `).get(accountName, title);
 }
 
+// 修正历史遗留的错误编码 URL。早先 import-archive.js 用
+// URLSearchParams.toString() 拼参数，把 __biz 末尾的 == 编码成了 %3D%3D，
+// 微信认不出来会 302 到「未知错误」页，卡片链接点不开。
+// 直接原地改 url，不新增行；改完与既有行撞车的（同一篇被导过两次）删掉旧的。
+const fixEncodedUrls = db.transaction((accountName) => {
+  const rows = db.prepare(`
+    SELECT id, url FROM articles WHERE account_name = ? AND url LIKE '%\%3D%' ESCAPE '\\'
+  `).all(accountName);
+
+  let fixed = 0, merged = 0;
+  for (const r of rows) {
+    const good = r.url.replace(/%3D/g, '=');
+    const clash = db.prepare('SELECT id FROM articles WHERE url = ? AND id != ?').get(good, r.id);
+    if (clash) {
+      // 同一篇已有一条正确 URL 的记录，删掉这条编码坏的
+      db.prepare('DELETE FROM article_entities WHERE article_id = ?').run(r.id);
+      db.prepare('DELETE FROM articles WHERE id = ?').run(r.id);
+      merged++;
+    } else {
+      db.prepare('UPDATE articles SET url = ?, updated_at = datetime(\'now\', \'+8 hours\') WHERE id = ?').run(good, r.id);
+      fixed++;
+    }
+  }
+  return { fixed, merged, scanned: rows.length };
+});
+
 function findArticleByUrl(url) {
   return db.prepare('SELECT id, title, status, published_at AS publishedAt FROM articles WHERE url = ?').get(url);
 }
@@ -400,6 +426,7 @@ module.exports = {
   getIndexStats,
   listPendingArticles,
   findArticleByUrl,
+  fixEncodedUrls,
   setSyncMeta,
   getSyncMeta,
 };

@@ -250,3 +250,29 @@ test('错误的 key 被拒', async () => {
   assert.strictEqual(status, 401);
   assert.strictEqual(body.ok, false);
 });
+
+test('fix-urls: 把 %3D%3D 改回 ==，重复的合并掉', async () => {
+  const acc = '编码修复号';
+  await post('/api/import-articles', {
+    accountName: acc,
+    articles: [
+      // 坏的：__biz 被编码
+      { title: '坏链接文章', url: 'https://mp.weixin.qq.com/s?__biz=MzAx%3D%3D&mid=1&idx=1&sn=f1&chksm=a',
+        thumbUrl: 'https://mmbiz/1.jpg', bodyText: 'x', publishedAt: '2026-01-01' },
+      // 另一篇也是坏的，但没有对应的好链接
+      { title: '另一篇坏的', url: 'https://mp.weixin.qq.com/s?__biz=MzAx%3D%3D&mid=2&idx=1&sn=f2&chksm=b',
+        thumbUrl: 'https://mmbiz/2.jpg', bodyText: 'y', publishedAt: '2026-01-02' },
+    ],
+  }, auth());
+
+  const { status, body } = await post('/api/fix-urls', { accountName: acc }, auth());
+  assert.strictEqual(status, 200);
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.scanned, 2);
+  assert.strictEqual(body.fixed, 2);
+  assert.strictEqual(body.merged, 0);
+
+  // 再跑一次应该没有可修的了（幂等）
+  const again = await post('/api/fix-urls', { accountName: acc }, auth());
+  assert.strictEqual(again.body.scanned, 0);
+});
