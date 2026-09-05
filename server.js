@@ -527,6 +527,71 @@ app.get('/api/pending-articles', auth, (req, res) => {
   res.json({ rows: db.listPendingArticles(accountName) });
 });
 
+// ── 给 Chrome 插件用的两个薄路由 ──
+//
+// 插件的正文是它自己在 Notion/飞书 页面上解析好的，没有 crawl 阶段，
+// 所以复用不了 /api/prepare（那条会去爬页面，慢且可能因登录态拿不到内容）。
+// 也不能用 /api/publish —— 那条最后会建微信草稿，插件只是要一段 HTML。
+
+// 算推荐候选。纯计算，不碰浏览器，毫秒级。
+app.post('/api/recommend', auth, (req, res) => {
+  const { accountName, title, bodyText } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  if (!title)       return res.status(400).json({ error: '缺少文章标题' });
+
+  try {
+    const body = String(bodyText || '');
+    const current = {
+      title,
+      entities:    extractEntities(title, body),
+      summaryText: articleIndex.makeSummary(title, body),
+      url:         '',
+      sourceUrl:   String(req.body.sourceUrl || ''),
+    };
+    const { docFreq, totalDocs } = db.getEntityDocFreq(accountName);
+    const candidates = recommend({
+      current,
+      candidates: db.listPublishedArticles(accountName),
+      docFreq, totalDocs, limit: 8,
+    });
+    res.json({ candidates });
+  } catch (e) {
+    console.error('[Recommend] 失败:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 合成卡片并返回可直接拼到正文末尾的 HTML。
+// 插件不用懂排版，以后改样式也不用动插件。
+// 会下载封面 + 无头浏览器截图，每张卡片一两秒。
+app.post('/api/recommend-html', auth, async (req, res) => {
+  const { accountName, selectedIds } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  const ids = Array.isArray(selectedIds) ? selectedIds : [];
+  if (ids.length === 0) return res.json({ html: '', count: 0 });
+  if (ids.length > 8)   return res.status(400).json({ error: '最多 8 篇' });
+
+  try {
+    const pool   = db.listPublishedArticles(accountName);
+    // 按传入顺序保留，pool 里找不到的（已删除）跳过
+    const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
+    const cards  = await renderCards(chosen.map(a => ({
+      title: a.title,
+      url:   a.url,
+      date:  String(a.publishedAt || '').slice(0, 10).replace(/-/g, '.'),
+      coverUrl: a.thumbUrl,
+    })));
+    res.json({
+      html: buildRecommendBlock(cards),
+      count: cards.length,
+      skipped: chosen.length - cards.length,   // 封面取不到的
+    });
+  } catch (e) {
+    console.error('[RecommendHtml] 失败:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 取回草稿正文。排查微信剥掉了哪些样式时用：
 // 把我们发过去的 HTML 和这里返回的一 diff 就知道了。
 app.post('/api/draft-html', auth, async (req, res) => {

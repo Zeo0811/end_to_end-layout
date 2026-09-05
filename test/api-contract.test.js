@@ -150,3 +150,60 @@ test('add-article: 带跟踪参数的同一篇也认得出重复', async () => {
   assert.strictEqual(status, 409);
   assert.strictEqual(body.mode, 'duplicate');
 });
+
+// ── 给插件用的两个薄路由 ──
+
+test('recommend: 库里没有相关文章时返回空数组，不是错误', async () => {
+  const { status, body } = await post('/api/recommend',
+    { accountName: '插件号', title: 'Cursor 深度实测', bodyText: '我们用了一个月 Cursor' }, auth());
+  assert.strictEqual(status, 200);
+  assert.strictEqual(body.ok, true);
+  assert.deepStrictEqual(body.candidates, []);
+});
+
+test('recommend: 能召回讲同一个对象的历史文章', async () => {
+  const acc = '插件召回号';
+  await post('/api/import-articles', {
+    accountName: acc,
+    articles: [
+      { title: 'Devin 对决 Cursor', url: 'https://mp.weixin.qq.com/s?__biz=P==&sn=r1&chksm=a',
+        thumbUrl: 'https://mmbiz/1.jpg', bodyText: '我们把 Cursor 和 Devin 放一起比', publishedAt: '2024-12-13' },
+      { title: '卧底 Cursor 内部 60 天', url: 'https://mp.weixin.qq.com/s?__biz=P==&sn=r2&chksm=b',
+        thumbUrl: 'https://mmbiz/2.jpg', bodyText: 'Cursor 团队是怎么工作的', publishedAt: '2025-11-10' },
+      { title: '聊聊播客这门生意', url: 'https://mp.weixin.qq.com/s?__biz=P==&sn=r3&chksm=c',
+        thumbUrl: 'https://mmbiz/3.jpg', bodyText: '播客的商业模式', publishedAt: '2026-01-01' },
+    ],
+  }, auth());
+
+  const { body } = await post('/api/recommend',
+    { accountName: acc, title: 'Cursor 又更新了', bodyText: '这次我们再看看 Cursor' }, auth());
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.candidates.length, 2, '播客那篇不该进来');
+  // 最新的在上面
+  assert.strictEqual(body.candidates[0].title, '卧底 Cursor 内部 60 天');
+  assert.ok(body.candidates[0].sharedEntities.includes('cursor'), '要带出共同话题给用户看');
+  assert.ok(body.candidates[0].thumbUrl, '缩略图要给到，插件面板要显示');
+});
+
+test('recommend: 缺标题时带 ok:false', async () => {
+  const { status, body } = await post('/api/recommend', { accountName: 'x', bodyText: 'y' }, auth());
+  assert.strictEqual(status, 400);
+  assert.strictEqual(body.ok, false);
+  assert.match(body.error, /标题/);
+});
+
+test('recommend-html: 没选任何篇时返回空串，不报错', async () => {
+  const { status, body } = await post('/api/recommend-html',
+    { accountName: '插件号', selectedIds: [] }, auth());
+  assert.strictEqual(status, 200);
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.html, '');
+  assert.strictEqual(body.count, 0);
+});
+
+test('recommend-html: 超过 8 篇带 ok:false', async () => {
+  const { status, body } = await post('/api/recommend-html',
+    { accountName: 'x', selectedIds: [1,2,3,4,5,6,7,8,9] }, auth());
+  assert.strictEqual(status, 400);
+  assert.strictEqual(body.ok, false);
+});
