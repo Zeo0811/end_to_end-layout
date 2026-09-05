@@ -107,11 +107,23 @@ function recommend({ current, candidates, docFreq = {}, totalDocs = 0, limit = 8
     });
   }
 
+  // 两步排序，两个目的不冲突：
+  //   1. 先按相关度取前 limit 篇 —— 命中 30 篇时要留下最相关的 8 篇，
+  //      而不是最新的 8 篇（后者可能只是勉强沾边）
+  //   2. 再把这几篇按发布时间倒序展示 —— 最新的排在最上面
+  // 这个顺序同时决定了用户看到的选项顺序和文末卡片的排列顺序。
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     return String(b.publishedAt || '').localeCompare(String(a.publishedAt || ''));
   });
-  return scored.slice(0, limit);
+  const picked = scored.slice(0, limit);
+
+  picked.sort((a, b) => {
+    const d = String(b.publishedAt || '').localeCompare(String(a.publishedAt || ''));
+    if (d !== 0) return d;
+    return b.score - a.score;   // 没有发布时间的退回按相关度
+  });
+  return picked;
 }
 
 module.exports = { extractEntities, looksLikeGarbage, bigramSet, bigramCosine, isDiscriminative, recommend };

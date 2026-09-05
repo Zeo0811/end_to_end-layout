@@ -206,3 +206,50 @@ test('recommend: 标题相同的候选被排除（重发旧文场景）', () => 
   });
   assert.deepStrictEqual(out.map(x => x.id), [2]);
 });
+
+// ── 展示顺序：最新发布的在上面 ──
+
+test('recommend: 结果按发布时间倒序展示', () => {
+  const base = { entities: { cursor: 3 }, summaryText: 'x', thumbUrl: 't' };
+  const out = recommend({
+    current: { entities: { cursor: 3 }, summaryText: 'x', url: '', sourceUrl: '' },
+    candidates: [
+      { id: 1, title: '2024 年的', url: 'https://mp/1', publishedAt: '2024-03-11', ...base },
+      { id: 2, title: '2026 年的', url: 'https://mp/2', publishedAt: '2026-08-14', ...base },
+      { id: 3, title: '2025 年的', url: 'https://mp/3', publishedAt: '2025-09-25', ...base },
+    ],
+    docFreq: { cursor: 5 }, totalDocs: 1000, limit: 8,
+  });
+  assert.deepStrictEqual(out.map(x => x.id), [2, 3, 1], '应是 2026 → 2025 → 2024');
+});
+
+test('recommend: 先按相关度截到 limit，再按时间排——不能让旧的高相关被新的低相关挤掉', () => {
+  const mk = (id, ents, at) => ({ id, title: 't' + id, url: 'https://mp/' + id,
+    thumbUrl: 't', entities: ents, summaryText: 'x', publishedAt: at });
+  const out = recommend({
+    current: { entities: { cursor: 3, manus: 3 }, summaryText: 'x', url: '', sourceUrl: '' },
+    candidates: [
+      mk(1, { cursor: 3, manus: 3 }, '2024-01-01'),  // 最相关但最旧
+      mk(2, { cursor: 1 },           '2026-01-01'),  // 最新但只沾一点
+      mk(3, { cursor: 1 },           '2026-02-01'),
+    ],
+    docFreq: { cursor: 5, manus: 5 }, totalDocs: 1000, limit: 2,
+  });
+  // 相关度选出 1 和 3（1 共享两个实体分最高，3 比 2 新），再按时间倒序
+  assert.strictEqual(out.length, 2);
+  assert.ok(out.some(x => x.id === 1), '最相关的那篇不能因为旧就被挤掉');
+  assert.deepStrictEqual(out.map(x => x.id), [3, 1], '展示顺序仍是新在前');
+});
+
+test('recommend: 没有发布时间的排在有时间的后面', () => {
+  const base = { entities: { cursor: 3 }, summaryText: 'x', thumbUrl: 't' };
+  const out = recommend({
+    current: { entities: { cursor: 3 }, summaryText: 'x', url: '', sourceUrl: '' },
+    candidates: [
+      { id: 1, title: '无日期', url: 'https://mp/1', publishedAt: '', ...base },
+      { id: 2, title: '有日期', url: 'https://mp/2', publishedAt: '2026-01-01', ...base },
+    ],
+    docFreq: { cursor: 5 }, totalDocs: 1000, limit: 8,
+  });
+  assert.deepStrictEqual(out.map(x => x.id), [2, 1]);
+});
