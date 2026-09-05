@@ -14,9 +14,14 @@ const CARD_WIDTH   = 375 * SCALE;   // 750
 const COVER_HEIGHT = 150 * SCALE;   // 300 —— 比早先的 180pt 再低一点
 const JPEG_QUALITY = 88;
 
-// 与正文排版同源：品牌绿、微信默认字体栈、15px 正文、0.034em 字距
+// 字体栈直接取自 formatter.js 的正文定义，不另写一份 —— 两边各写一份迟早会漂。
+// 尾部补 Noto Sans CJK SC：Railway 容器里没有 PingFang SC（macOS 专有，
+// 且是 Apple 授权字体不能打包），nixpacks 装的是 noto-fonts-cjk-sans，
+// 字形结构与 PingFang 接近。本机开发时仍然命中 PingFang SC。
+const { WX_FONT, WX_LS } = require('./formatter');
+
 const GREEN     = '#327848';
-const FONT      = '"Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+const FONT      = `${WX_FONT}, "Noto Sans CJK SC", "Source Han Sans SC"`;
 const TITLE_PX  = 15 * SCALE;       // 30
 const META_PX   = 12 * SCALE;       // 24
 const PAD_Y     = 14 * SCALE;       // 28
@@ -65,14 +70,38 @@ function buildCardHtml({ title, date, coverDataUri }) {
   .bar { padding: ${PAD_Y}px ${PAD_X}px; }
   .title {
     font-size: ${TITLE_PX}px; line-height: 1.6; color: #fff; font-weight: 600;
-    letter-spacing: 0.034em;
+    letter-spacing: ${WX_LS};
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .meta { font-size: ${META_PX}px; line-height: 1.6; color: rgba(255,255,255,.72);
-          letter-spacing: 0.034em; margin-top: ${6 * SCALE}px; }
+          letter-spacing: ${WX_LS}; margin-top: ${6 * SCALE}px; }
   </style></head><body>
   <div class="card">${cover}<div class="bar"><div class="title">${esc(title)}</div>${meta}</div></div>
   </body></html>`;
+}
+
+// 只在首次渲染时探一次：容器里到底有没有中文字体、命中的是哪一个。
+// 没有的话卡片上的中文会是豆腐块，而这件事在 Railway 上不看日志发现不了。
+let fontProbed = false;
+async function probeFonts(page) {
+  if (fontProbed) return;
+  fontProbed = true;
+  try {
+    const hit = await page.evaluate(() => {
+      const cands = ['PingFang SC', 'Noto Sans CJK SC', 'Source Han Sans SC',
+                     'Hiragino Sans GB', 'Microsoft YaHei', 'Heiti SC'];
+      return {
+        available: cands.filter(f => document.fonts.check(`30px "${f}"`, '中')),
+        canRenderCJK: document.fonts.check('30px sans-serif', '中'),
+      };
+    });
+    if (hit.available.length) {
+      console.log(`[Card] 中文字体可用: ${hit.available.join(', ')}`);
+    } else {
+      console.warn('[Card] 警告：没有匹配到任何中文字体，卡片上的中文可能是豆腐块。'
+        + '检查 nixpacks.toml 里的 noto-fonts-cjk-sans 是否生效');
+    }
+  } catch (_) { /* 探测失败不影响出图 */ }
 }
 
 async function renderCard({ title, date, coverUrl, coverDataUri }) {
@@ -87,6 +116,7 @@ async function renderCard({ title, date, coverUrl, coverDataUri }) {
   try {
     const page = await context.newPage();
     await page.setContent(buildCardHtml({ title, date, coverDataUri: cover }), { waitUntil: 'load' });
+    await probeFonts(page);
     const buf = await page.locator('.card').screenshot({ type: 'jpeg', quality: JPEG_QUALITY });
     return `data:image/jpeg;base64,${buf.toString('base64')}`;
   } catch (e) {

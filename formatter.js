@@ -409,4 +409,6 @@ function buildRecommendBlock(cards) {
 }
 
 
-module.exports = { formatToWechat, buildRecommendBlock };
+// WX_FONT / WX_COLOR 等一并导出：card-renderer.js 渲染卡片时要用同一套，
+// 两边各写一份迟早会漂。
+module.exports = { formatToWechat, buildRecommendBlock, WX_FONT, WX_SIZE, WX_COLOR, WX_LS };

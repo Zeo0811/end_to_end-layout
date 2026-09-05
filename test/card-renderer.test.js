@@ -23,10 +23,20 @@ test('buildCardHtml: 标题转义，封面嵌入', () => {
   assert.ok(h.includes('2025.09.25'));
 });
 
-test('buildCardHtml: 用品牌绿和中文字体栈', () => {
-  const h = buildCardHtml({ title: '标题', date: '', coverDataUri: RED });
+test('buildCardHtml: 字体栈与正文同源，不另写一份', () => {
+  const { WX_FONT, WX_LS } = require('../formatter');
+  const h = buildCardHtml({ title: '标题', date: '2025.01.01', coverDataUri: RED });
+  assert.ok(h.includes(WX_FONT), '必须直接用 formatter 的正文字体栈');
+  assert.ok(h.includes(`letter-spacing: ${WX_LS}`), '字距也走同一个 token');
+  // 尾部补 Noto：容器里没有 PingFang SC（macOS 专有）
+  assert.ok(h.includes('Noto Sans CJK SC'), '容器降级字体');
   assert.ok(h.includes('#327848'), '品牌绿');
-  assert.ok(/Noto Sans CJK|PingFang SC/.test(h), '容器里靠 Noto CJK，本机靠 PingFang');
+});
+
+test('buildCardHtml: 字号是正文的 2 倍（卡片是 2 倍图）', () => {
+  const h = buildCardHtml({ title: '标题', date: '2025.01.01', coverDataUri: RED });
+  assert.ok(h.includes('font-size: 30px'), '标题 15pt @2x');
+  assert.ok(h.includes('font-size: 24px'), '日期 12pt @2x');
 });
 
 test('buildCardHtml: 没有日期时不画日期行', () => {
