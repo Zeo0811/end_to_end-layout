@@ -276,3 +276,33 @@ test('fix-urls: 把 %3D%3D 改回 ==，重复的合并掉', async () => {
   const again = await post('/api/fix-urls', { accountName: acc }, auth());
   assert.strictEqual(again.body.scanned, 0);
 });
+
+test('fix-urls: 带 dropMissingChksm 时删掉缺 chksm 的行', async () => {
+  const acc = 'chksm 号';
+  await post('/api/import-articles', {
+    accountName: acc,
+    articles: [
+      { title: '缺 chksm 的', url: 'https://mp.weixin.qq.com/s?__biz=A==&mid=1&idx=1&sn=n1',
+        thumbUrl: 'https://mmbiz/1.jpg', bodyText: 'x', publishedAt: '2026-01-01' },
+      { title: '完整的',      url: 'https://mp.weixin.qq.com/s?__biz=A==&mid=2&idx=1&sn=n2&chksm=cc',
+        thumbUrl: 'https://mmbiz/2.jpg', bodyText: 'y', publishedAt: '2026-01-02' },
+    ],
+  }, auth());
+
+  const { body } = await post('/api/fix-urls', { accountName: acc, dropMissingChksm: true }, auth());
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.dropped, 1, '只该删缺 chksm 的那条');
+  assert.strictEqual(body.stats.published, 1, '完整的那条要留着');
+});
+
+test('fix-urls: 不带 dropMissingChksm 时不删任何行', async () => {
+  const acc = 'chksm 保守号';
+  await post('/api/import-articles', {
+    accountName: acc,
+    articles: [{ title: '缺 chksm', url: 'https://mp.weixin.qq.com/s?__biz=B==&mid=9&idx=1&sn=n9',
+                 thumbUrl: 'https://mmbiz/x.jpg', bodyText: 'x', publishedAt: '2026-01-01' }],
+  }, auth());
+  const { body } = await post('/api/fix-urls', { accountName: acc }, auth());
+  assert.strictEqual(body.dropped, 0);
+  assert.strictEqual(body.stats.published, 1);
+});

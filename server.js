@@ -548,8 +548,11 @@ app.post('/api/fix-urls', auth, (req, res) => {
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
   try {
     const r = db.fixEncodedUrls(accountName);
-    console.log(`[FixUrls] ${accountName} 扫描 ${r.scanned} 条，修正 ${r.fixed}，合并 ${r.merged}`);
-    res.json({ ...r, stats: db.getIndexStats(accountName) });
+    // 缺 chksm 的链接微信只返回 JS 壳，卡片点进去打不开。
+    // 这些行补不回参数，只能删掉，之后重跑 import-archive.js 导正确的。
+    const d = req.body.dropMissingChksm ? db.dropUrlsMissingChksm(accountName) : { dropped: 0 };
+    console.log(`[FixUrls] ${accountName} 扫描 ${r.scanned}，修正 ${r.fixed}，合并 ${r.merged}，删除缺 chksm ${d.dropped}`);
+    res.json({ ...r, ...d, stats: db.getIndexStats(accountName) });
   } catch (e) {
     console.error('[FixUrls] 失败:', e.message);
     res.status(500).json({ error: e.message });

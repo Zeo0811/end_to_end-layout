@@ -356,6 +356,23 @@ const fixEncodedUrls = db.transaction((accountName) => {
   return { fixed, merged, scanned: rows.length };
 });
 
+// 删掉缺 chksm 的历史记录。早先 import-archive.js 的 KEEP_PARAMS 没有
+// chksm，导进来的 545 篇链接都少这个参数 —— 微信没有它只返回一段 JS 壳，
+// 卡片点进去打不开文章。这些行没法原地补，只能删掉重新导。
+// 按 sn 匹配同一篇：sn 是文章唯一标识，chksm 只是校验码。
+const dropUrlsMissingChksm = db.transaction((accountName) => {
+  const rows = db.prepare(`
+    SELECT id, url FROM articles
+    WHERE account_name = ? AND url LIKE '%mp.weixin.qq.com%' AND url NOT LIKE '%chksm=%'
+  `).all(accountName);
+
+  for (const r of rows) {
+    db.prepare('DELETE FROM article_entities WHERE article_id = ?').run(r.id);
+    db.prepare('DELETE FROM articles WHERE id = ?').run(r.id);
+  }
+  return { dropped: rows.length };
+});
+
 function findArticleByUrl(url) {
   return db.prepare('SELECT id, title, status, published_at AS publishedAt FROM articles WHERE url = ?').get(url);
 }
@@ -427,6 +444,7 @@ module.exports = {
   listPendingArticles,
   findArticleByUrl,
   fixEncodedUrls,
+  dropUrlsMissingChksm,
   setSyncMeta,
   getSyncMeta,
 };
