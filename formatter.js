@@ -116,8 +116,10 @@ const S = {
   //              但收到 20px + 4px 边框，不与文章真正的 H1 抢层级；
   //   每张卡片 = callout 的语汇（#f7faf8 底 + 1px 绿边），
   //              字体字号字距全部走正文那套，不再靠截图。
-  recommend_wrapper: `display: block; margin: 50px 0 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
-  recommend_title:   `display: block; line-height: 1.5; font-size: 20px; font-family: ${WX_FONT}; font-weight: bold; margin: 0 auto 26px; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em 6px; border-bottom: 4px solid #327848; letter-spacing: ${WX_LS};`,
+  recommend_wrapper: `display: block; margin: 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
+  // 与文章 H1 逐字相同（S.h1），只把上边距从 80px 收到 40px ——
+  // 板块上方已有一条分隔线，再留 80px 会空一大截。
+  recommend_title:   `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 40px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
   // 链接基础样式。line-height: inherit 防止微信塞的 <span leaf=""> 撑出多余行框
   reco_a_link:  `display: block; text-decoration: none; line-height: inherit;`,
 

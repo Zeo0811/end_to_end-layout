@@ -89,12 +89,23 @@ test('buildRecommendBlock: 字体字号字距与正文一致', () => {
   assert.ok(html.includes('letter-spacing: 0.034em'), '字距与正文一致');
 });
 
-test('buildRecommendBlock: 板块标题沿用 H1 语汇但不抢层级', () => {
+test('buildRecommendBlock: 板块标题与文章 H1 逐项一致', () => {
+  // 早先收成 20px + 4px 边框 + 6px 下内边距，想着别抢层级，
+  // 结果在微信里看着就不像同一套排版。改为与 S.h1 完全相同。
   const html = buildRecommendBlock(CARDS);
-  assert.ok(html.includes('border-bottom: 4px solid #327848'), '绿色下边框，收窄到 4px');
-  assert.ok(html.includes('width: fit-content'));
-  assert.ok(html.includes('text-align: center'));
-  assert.ok(!html.includes('border-bottom: 8px'), '8px 是文章 H1 的，不能占用');
+  for (const token of [
+    'font-size: 24px',
+    'font-weight: bold',
+    'color: #327848',
+    'border-bottom: 8px solid #327848',
+    'padding: 0 0.25em;',
+    'width: fit-content',
+    'text-align: center',
+    'line-height: 1.5',
+  ]) {
+    assert.ok(html.includes(token), `板块标题缺少 H1 的 ${token}`);
+  }
+  assert.ok(!html.includes('padding: 0 0.25em 6px'), '不该有额外下内边距，会把下划线推开');
 });
 
 test('buildRecommendBlock: 方案 A 沿用 callout 语汇', () => {
