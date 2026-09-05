@@ -8,11 +8,20 @@
 
 const { ensureBrowser } = require('./parsers/crawler');
 
-// 2 倍图，对应正文 375pt 显示宽度
-const SCALE        = 2;
-const CARD_WIDTH   = 375 * SCALE;   // 750
-const COVER_HEIGHT = 150 * SCALE;   // 300 —— 比早先的 180pt 再低一点
-const JPEG_QUALITY = 88;
+// CSS 用真实显示尺寸（375pt 正文宽度），靠 deviceScaleFactor 出高倍图。
+//
+// 早先的做法是把尺寸硬乘 2 写进 CSS，出 750px 的图。两个问题：
+//   1. iPhone Pro 系列是 3 倍屏，750 的图在 375pt 上要放大 1.5 倍，字发虚
+//   2. 用大号 CSS px 排版，文字光栅化拿不到高 DPI 的 subpixel 定位，
+//      不如让浏览器直接按 3 倍渲染清晰
+const CARD_WIDTH_PT   = 375;   // 正文显示宽度
+const COVER_HEIGHT_PT = 150;   // 封面高度，比早先的 180 低一点
+const DPR             = 3;     // 覆盖到 3 倍屏
+const JPEG_QUALITY    = 94;    // 图里有文字，压太狠边缘会起毛刺
+
+// 实际输出像素，供调用方与测试参考
+const CARD_WIDTH   = CARD_WIDTH_PT * DPR;     // 1125
+const COVER_HEIGHT = COVER_HEIGHT_PT * DPR;   // 450
 
 // 字距取自 formatter.js 的正文定义，不另写一份 —— 两边各写一份迟早会漂。
 const { WX_LS } = require('./formatter');
@@ -51,10 +60,10 @@ const FONT_FACES = fontFace(400, FONT_REGULAR) + fontFace(600, FONT_MEDIUM);
 const GREEN = '#327848';
 // 内嵌字体排第一；万一读取失败，后面这串是系统字体的兜底
 const FONT  = '"HarmonyOS Sans SC", "PingFang SC", "Noto Sans CJK SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-const TITLE_PX  = 15 * SCALE;       // 30
-const META_PX   = 12 * SCALE;       // 24
-const PAD_Y     = 14 * SCALE;       // 28
-const PAD_X     = 16 * SCALE;       // 32
+const TITLE_PX  = 15;   // 与正文同字号
+const META_PX   = 12;
+const PAD_Y     = 14;
+const PAD_X     = 16;
 
 function esc(s) {
   return String(s || '')
@@ -95,8 +104,8 @@ function buildCardHtml({ title, date, coverDataUri }) {
   ${FONT_FACES}
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #fff; font-family: ${FONT}; }
-  .card { width: ${CARD_WIDTH}px; background: ${GREEN}; overflow: hidden; }
-  .cover { width: ${CARD_WIDTH}px; height: ${COVER_HEIGHT}px; object-fit: cover; object-position: center; display: block; }
+  .card { width: ${CARD_WIDTH_PT}px; background: ${GREEN}; overflow: hidden; }
+  .cover { width: ${CARD_WIDTH_PT}px; height: ${COVER_HEIGHT_PT}px; object-fit: cover; object-position: center; display: block; }
   .bar { padding: ${PAD_Y}px ${PAD_X}px; }
   .title {
     font-size: ${TITLE_PX}px; line-height: 1.6; color: #fff; font-weight: 600;
@@ -104,7 +113,7 @@ function buildCardHtml({ title, date, coverDataUri }) {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .meta { font-size: ${META_PX}px; line-height: 1.6; color: rgba(255,255,255,.72);
-          letter-spacing: ${WX_LS}; margin-top: ${6 * SCALE}px; }
+          letter-spacing: ${WX_LS}; margin-top: 6px; }
   </style></head><body>
   <div class="card">${cover}<div class="bar"><div class="title">${esc(title)}</div>${meta}</div></div>
   </body></html>`;
@@ -140,8 +149,8 @@ async function renderCard({ title, date, coverUrl, coverDataUri }) {
 
   const browser = await ensureBrowser();
   const context = await browser.newContext({
-    deviceScaleFactor: 1,   // 尺寸里已经乘过 SCALE，这里不能再翻倍
-    viewport: { width: CARD_WIDTH, height: COVER_HEIGHT + 300 },
+    deviceScaleFactor: DPR,   // 出 3 倍图，覆盖 iPhone Pro 系列
+    viewport: { width: CARD_WIDTH_PT, height: COVER_HEIGHT_PT + 200 },
   });
   try {
     const page = await context.newPage();
@@ -167,4 +176,5 @@ async function renderCards(items) {
   return out;
 }
 
-module.exports = { fetchImageAsDataUri, buildCardHtml, renderCard, renderCards, CARD_WIDTH, COVER_HEIGHT };
+module.exports = { fetchImageAsDataUri, buildCardHtml, renderCard, renderCards,
+  CARD_WIDTH, COVER_HEIGHT, CARD_WIDTH_PT, COVER_HEIGHT_PT, DPR };
