@@ -90,8 +90,10 @@ test('管线：召回结果直接落进正文 wrapper 之内', () => {
   assert.ok(html.includes('推荐阅读'));
   // 板块必须在最外层 wrapper 之内，否则丢基础字体字色
   assert.ok(html.indexOf('推荐阅读') < html.lastIndexOf('</section>'), '推荐板块跑到 wrapper 外面了');
-  // 两个可点击链接，指向真实 mp 地址
-  assert.strictEqual((html.match(/<a href="https:\/\/mp\.weixin\.qq\.com\/s\//g) || []).length, 2);
+  // 两篇文章都能跳转（每篇的封面/标题/日期各带一个链接）
+  const links = html.match(/<a href="(https:\/\/mp\.weixin\.qq\.com\/s\/[^"]+)"/g) || [];
+  assert.ok(links.length >= 2, `实际 ${links.length} 个链接`);
+  assert.strictEqual(new Set(links).size, 2, '应指向两篇不同的文章');
   // db 出来的 publishedAt 一路传到日期行
   assert.ok(html.includes('2026.01.01'), '日期应渲染出来');
   // 纯 HTML，不再有图片

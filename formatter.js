@@ -118,7 +118,8 @@ const S = {
   //              字体字号字距全部走正文那套，不再靠截图。
   recommend_wrapper: `display: block; margin: 50px 0 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
   recommend_title:   `display: block; line-height: 1.5; font-size: 20px; font-family: ${WX_FONT}; font-weight: bold; margin: 0 auto 26px; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em 6px; border-bottom: 4px solid #327848; letter-spacing: ${WX_LS};`,
-  recommend_link:    `display: block; text-decoration: none; color: ${WX_COLOR};`,
+  // 链接基础样式。line-height: inherit 防止微信塞的 <span leaf=""> 撑出多余行框
+  reco_a_link:  `display: block; text-decoration: none; line-height: inherit;`,
 
   // 封面统一裁切。宽高都写死，object-fit 万一被微信剥掉，
   // 图会被压扁但版面不塌 —— 比高度失控好收拾。
@@ -414,37 +415,52 @@ function pickDate(raw) {
 
 // 文末「推荐阅读」板块。cards 为空时返回空串，整个板块不出现。
 //
-// 用纯 HTML 而不是合成图：微信正文里 <a> 包住文字同样能跳转，
-// 做成图片反而要迁就容器字库、强行裁切封面、还要过防盗链。
-// 封面用 <img> 直连原图，publishArticle 的 processHtmlImages
-// 会自动下载并转存到 mmbiz，防盗链在服务端就解决了。
+// 关键约束：**不能用 <a> 包块级元素**。微信编辑器不允许，会把它拆成
+// 每块一个独立的 <a>，并给每段套一个 <span leaf="">。那个 span 继承外层
+// 1.6em 行高，会在卡片里撑出一大片空白（实测绿底卡片图文之间多出约 100px）。
+// 所以这里每个文字块自带链接，图片单独一个链接，结构与微信最终形态一致。
+//
+// 微信还会给站内链接补 &scene=21#wechat_redirect，并给 <a> 强制加
+// color: rgb(51,51,51)。所以链接文字的颜色要写在 <a> 自己身上，
+// 靠父级继承会被覆盖。
 //
 // variant: 'a' 左图右字 | 'b' 上图下字白底 | 'c' 上图下字绿底
 function buildRecommendBlock(cards, variant = 'c') {
   if (!Array.isArray(cards) || cards.length === 0) return '';
 
   const items = cards.map(c => {
+    const href  = escAttr(c.url);
     const date  = pickDate(c.publishedAt);
     const thumb = c.thumbUrl ? escAttr(c.thumbUrl) : '';
     const title = escHtml(c.title);
     const light = variant === 'c';
-    const titleS = light ? S.reco_title_light : S.reco_title_dark;
-    const metaS  = light ? S.reco_meta_light  : S.reco_meta_dark;
-    const meta   = date ? `<section style="${metaS}">${date}</section>` : '';
-    const text   = `<section style="${titleS}">${title}</section>${meta}`;
 
-    let inner;
+    // 颜色直接写在 <a> 上：微信会给 <a> 强制加 color，父级继承挡不住
+    const titleColor = light ? '#ffffff' : WX_COLOR;
+    const metaColor  = light ? 'rgba(255,255,255,.72)' : '#8a998f';
+    const linkTitle  = `<a href="${href}" style="${S.reco_a_link} color: ${titleColor}; font-weight: 600;">${title}</a>`;
+    const linkDate   = date
+      ? `<a href="${href}" style="${S.reco_a_link} color: ${metaColor};">${date}</a>`
+      : '';
+
+    const textBlock =
+      `<section style="${light ? S.reco_title_light : S.reco_title_dark}">${linkTitle}</section>`
+      + (date ? `<section style="${light ? S.reco_meta_light : S.reco_meta_dark}">${linkDate}</section>` : '');
+
+    const imgTag = (style) => thumb
+      ? `<a href="${href}" style="${S.reco_a_link}"><img src="${thumb}" alt="" style="${style}"></a>`
+      : '';
+
     if (variant === 'a') {
-      const img = thumb ? `<img src="${thumb}" alt="" style="${S.reco_a_thumb}">` : '';
-      inner = `<section style="${S.reco_a_card}">${img}<section style="${S.reco_a_body}">${text}</section></section>`;
-    } else if (variant === 'b') {
-      const img = thumb ? `<img src="${thumb}" alt="" style="${S.reco_b_thumb}">` : '';
-      inner = `<section style="${S.reco_b_card}">${img}<section style="${S.reco_b_body}">${text}</section></section>`;
-    } else {
-      const img = thumb ? `<img src="${thumb}" alt="" style="${S.reco_c_thumb}">` : '';
-      inner = `<section style="${S.reco_c_card}">${img}<section style="${S.reco_c_body}">${text}</section></section>`;
+      return `<section style="${S.reco_a_card}">${imgTag(S.reco_a_thumb)}`
+        + `<section style="${S.reco_a_body}">${textBlock}</section></section>`;
     }
-    return `<a href="${escAttr(c.url)}" style="${S.recommend_link}">${inner}</a>`;
+    if (variant === 'b') {
+      return `<section style="${S.reco_b_card}">${imgTag(S.reco_b_thumb)}`
+        + `<section style="${S.reco_b_body}">${textBlock}</section></section>`;
+    }
+    return `<section style="${S.reco_c_card}">${imgTag(S.reco_c_thumb)}`
+      + `<section style="${S.reco_c_body}">${textBlock}</section></section>`;
   }).join('');
 
   return `<section style="${S.recommend_wrapper}">`

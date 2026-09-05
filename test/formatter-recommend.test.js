@@ -32,12 +32,15 @@ test('buildRecommendBlock: 空数组返回空串（板块整体不出现）', ()
   assert.strictEqual(buildRecommendBlock(null), '');
 });
 
-test('buildRecommendBlock: 每篇一个指向 mp 的链接', () => {
+test('buildRecommendBlock: 每篇都能跳转', () => {
   const html = buildRecommendBlock(CARDS);
   assert.ok(html.includes('推荐阅读'));
-  assert.strictEqual((html.match(/<a href="https:\/\/mp\.weixin\.qq\.com/g) || []).length, 2);
   assert.ok(html.includes('文章一'));
   assert.ok(html.includes('文章二'));
+  // 无封面时每篇两个链接（标题、日期），两篇共 4 个
+  assert.strictEqual((html.match(/<a href="https:\/\/mp\.weixin\.qq\.com/g) || []).length, 4);
+  // 两篇各自指向自己
+  assert.ok(html.includes('sn=1') && html.includes('sn=2'));
 });
 
 test('buildRecommendBlock: 封面用原图直连，不再内嵌合成图', () => {
@@ -104,4 +107,42 @@ test('buildRecommendBlock: 默认方案 C —— 绿底白字', () => {
   const html = buildRecommendBlock(CARDS);
   assert.ok(html.includes('background-color: #327848'), '标题条用品牌绿');
   assert.ok(html.includes('color: #ffffff'), '标题用白字');
+});
+
+// ── 微信结构约束（实测 draft/get 取回的 HTML 得出）──
+
+test('buildRecommendBlock: <a> 不能包块级元素', () => {
+  // 微信编辑器不允许，会把它拆成每块一个独立 <a>，并给每段套 <span leaf="">。
+  // 那个 span 继承外层 1.6em 行高，在卡片里撑出约 100px 空白。
+  for (const v of ['a', 'b', 'c']) {
+    const html = buildRecommendBlock(CARDS_WITH_COVER, v);
+    assert.ok(!/<a[^>]*>\s*<section/.test(html), `方案 ${v}: <a> 直接包了 <section>`);
+  }
+});
+
+test('buildRecommendBlock: 每张卡片的图和文字各自带链接', () => {
+  const html = buildRecommendBlock([CARDS_WITH_COVER[0]], 'c');
+  // 一张卡片三个链接：封面、标题、日期，都指向同一篇
+  const links = html.match(/<a href="[^"]+"/g) || [];
+  assert.strictEqual(links.length, 3, `实际 ${links.length} 个链接`);
+  assert.ok(links.every(l => l === links[0]), '三个链接应指向同一篇文章');
+});
+
+test('buildRecommendBlock: 链接颜色写在 <a> 自身，不靠父级继承', () => {
+  // 微信会给 <a> 强制加 color: rgb(51,51,51)，父级继承挡不住，
+  // 绿底白字方案会变成绿底深灰字，几乎看不清
+  const html = buildRecommendBlock(CARDS_WITH_COVER, 'c');
+  assert.ok(/<a[^>]*color: #ffffff/.test(html), '标题链接必须自带白色');
+  assert.ok(/<a[^>]*color: rgba\(255,255,255,\.72\)/.test(html), '日期链接必须自带颜色');
+});
+
+test('buildRecommendBlock: 链接用 line-height: inherit，避免 span 撑高', () => {
+  const html = buildRecommendBlock(CARDS_WITH_COVER, 'c');
+  assert.ok(html.includes('line-height: inherit'), '微信塞的 <span leaf=""> 会继承行高撑出空白');
+});
+
+test('buildRecommendBlock: 没有 undefined 漏进样式串', () => {
+  for (const v of ['a', 'b', 'c']) {
+    assert.ok(!buildRecommendBlock(CARDS_WITH_COVER, v).includes('undefined'), `方案 ${v} 有 undefined`);
+  }
 });
