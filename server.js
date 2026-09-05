@@ -247,6 +247,7 @@ app.post('/api/prepare', auth, async (req, res) => {
       summaryText: articleIndex.makeSummary(title, bodyText),
       url:         '',
       sourceUrl:   url,
+      title,   // 重发旧文时靠标题排掉自己
     };
     const { docFreq, totalDocs } = db.getEntityDocFreq(accountName);
     const candidates = recommend({
@@ -374,6 +375,52 @@ app.post('/api/sync-articles', auth, async (req, res) => {
     console.error('[Sync] 失败:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// 批量导入历史文章。
+// 个人主体的公众号无法完成主体认证，「发布能力」接口组永远返回 48001，
+// freepublish 拿不到历史；素材接口只覆盖极少一部分。本地存档带永久链接，
+// 是这个账号唯一完整的历史来源，靠 scripts/import-archive.js 推上来。
+// 按 url 幂等（upsertArticle 内部处理），重复导入不会产生重复行。
+app.post('/api/import-articles', auth, (req, res) => {
+  const { accountName, articles } = req.body;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  if (!Array.isArray(articles) || articles.length === 0) {
+    return res.status(400).json({ error: '没有要导入的文章' });
+  }
+  if (articles.length > 200) {
+    return res.status(400).json({ error: '单批最多 200 篇，请分批导入' });
+  }
+
+  let imported = 0, skipped = 0;
+  const errors = [];
+  for (const a of articles) {
+    try {
+      if (!a || !a.url || !a.title) { skipped++; continue; }
+      const bodyText = String(a.bodyText || '');
+      const id = db.upsertArticle({
+        accountName,
+        title:       String(a.title),
+        digest:      String(a.digest || ''),
+        url:         String(a.url),
+        thumbUrl:    String(a.thumbUrl || ''),
+        status:      'published',
+        bodyText,
+        summaryText: articleIndex.makeSummary(a.title, bodyText),
+        publishedAt: String(a.publishedAt || ''),
+      });
+      db.setArticleEntities(id, extractEntities(a.title, bodyText));
+      imported++;
+    } catch (e) {
+      errors.push(`${String(a?.title || '?').slice(0, 30)}: ${e.message}`);
+    }
+  }
+
+  console.log(`[Import] ${accountName} 导入 ${imported} 篇，跳过 ${skipped} 篇，失败 ${errors.length} 篇`);
+  res.json({
+    ok: true, imported, skipped, failed: errors.length,
+    errors: errors.slice(0, 5), stats: db.getIndexStats(accountName),
+  });
 });
 
 // 接口权限诊断：把微信那边的真实情况打出来，避免靠猜。

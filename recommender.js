@@ -10,6 +10,17 @@ const DF_RATIO_MAX   = 0.15; // 出现在超过 15% 文章里的实体没有区�
 const DF_MIN_SAMPLE  = 50;   // 文章数低于此值时 df 统计不可信
 const BIGRAM_WEIGHT  = 0.3;  // bigram 在总分里的占比，只影响排序
 
+// 一串字母数字混排、既不像单词也不像产品名的，多半是图片 URL 或
+// 追踪 ID 的残留（如 brwkusp51itvvmbpcxncz1）。它们 df 很低，会被当成
+// 强信号，把毫不相干的两篇文章连起来。
+function looksLikeGarbage(key) {
+  if (key.length > 14) return true;                       // 正常产品名很少这么长
+  if (/\d/.test(key) && /[a-z]/.test(key) && key.length > 10) return true;
+  const letters = key.replace(/[^a-z]/g, '');
+  if (letters.length >= 8 && !/[aeiou]/.test(letters)) return true; // 无元音 = 不是词
+  return false;
+}
+
 function extractEntities(title, bodyText) {
   const ent = {};
 
@@ -17,7 +28,11 @@ function extractEntities(title, bodyText) {
     if (!raw) return;
     // 去掉尾部标点，如 "Cursor." → "cursor"
     const key = String(raw).replace(/[.+\-]+$/, '').toLowerCase().trim();
-    if (key.length < 2) return;
+    // 中文两字就是词（豆包、原神），拉丁串两字母多是噪声缩写，门槛不同
+    const isCJK = /[\u4e00-\u9fa5]/.test(key);
+    if (key.length < (isCJK ? 2 : 3)) return;
+    if (STOPWORDS.has(key)) return;    // 抽取阶段就挡掉，别进库占位
+    if (!isCJK && looksLikeGarbage(key)) return;
     ent[key] = Math.max(ent[key] || 0, weight);
   }
 
@@ -75,6 +90,8 @@ function recommend({ current, candidates, docFreq = {}, totalDocs = 0, limit = 8
     if (!c.url) continue;
     if (current.url       && c.url       === current.url)       continue;
     if (current.sourceUrl && c.sourceUrl === current.sourceUrl) continue;
+    // 标题兜底：重发旧文时 url 还没生成，靠 url 判断会把自己推给自己
+    if (current.title     && c.title     === current.title)     continue;
 
     const cEnt = c.entities || {};
     const shared = keys.filter(e => cEnt[e] > 0);
@@ -97,4 +114,4 @@ function recommend({ current, candidates, docFreq = {}, totalDocs = 0, limit = 8
   return scored.slice(0, limit);
 }
 
-module.exports = { extractEntities, bigramSet, bigramCosine, isDiscriminative, recommend };
+module.exports = { extractEntities, looksLikeGarbage, bigramSet, bigramCosine, isDiscriminative, recommend };

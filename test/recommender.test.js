@@ -159,3 +159,50 @@ test('recommend: 没有 url 的候选被排除', () => {
   });
   assert.deepStrictEqual(out, []);
 });
+
+// ── 噪声实体过滤 ──
+
+test('looksLikeGarbage: 图片 URL / 追踪 ID 残留被识别', () => {
+  const { looksLikeGarbage } = require('../recommender');
+  assert.strictEqual(looksLikeGarbage('brwkusp51itvvmbpcxncz1'), true, '长乱码串');
+  assert.strictEqual(looksLikeGarbage('ffcnsoq3kicszsk'), true, '无元音长串');
+  assert.strictEqual(looksLikeGarbage('cursor'), false);
+  assert.strictEqual(looksLikeGarbage('gpt-5'), false);
+  assert.strictEqual(looksLikeGarbage('manus'), false);
+  assert.strictEqual(looksLikeGarbage('deepseek'), false);
+});
+
+test('extractEntities: 乱码串不入库', () => {
+  const e = extractEntities('标题', '图片 brwkusp51itvvmbpcxncz1 在这里');
+  assert.strictEqual(e['brwkusp51itvvmbpcxncz1'], undefined);
+});
+
+test('extractEntities: 两字母缩写不入库（噪声远多于信号）', () => {
+  const e = extractEntities('AB CD 测试', '');
+  assert.deepStrictEqual(e, {});
+});
+
+test('extractEntities: 停用词在抽取阶段就被挡掉', () => {
+  const e = extractEntities('聊聊 AI 和 App', '');
+  assert.strictEqual(e.ai, undefined);
+  assert.strictEqual(e.app, undefined);
+});
+
+test('extractEntities: 正常产品名不受影响', () => {
+  const e = extractEntities('Cursor 与 DeepSeek 对比', 'Manus 也参战了');
+  assert.strictEqual(e.cursor, 3);
+  assert.strictEqual(e.deepseek, 3);
+  assert.strictEqual(e.manus, 2);
+});
+
+test('recommend: 标题相同的候选被排除（重发旧文场景）', () => {
+  const out = recommend({
+    current: { entities: { cursor: 3 }, summaryText: 'x', url: '', sourceUrl: '', title: '同一篇' },
+    candidates: [
+      { id: 1, title: '同一篇', url: 'https://mp/1', thumbUrl: 't', entities: { cursor: 3 }, summaryText: 'x', publishedAt: '2026-01-01' },
+      { id: 2, title: '另一篇', url: 'https://mp/2', thumbUrl: 't', entities: { cursor: 3 }, summaryText: 'x', publishedAt: '2026-01-01' },
+    ],
+    docFreq: { cursor: 5 }, totalDocs: 1000, limit: 8,
+  });
+  assert.deepStrictEqual(out.map(x => x.id), [2]);
+});
