@@ -89,26 +89,60 @@ function parseArticlePage(html) {
   return { title, thumbUrl, publishedAt, bodyText, digest };
 }
 
-async function fetchArticle(rawUrl) {
-  const url = canonicalUrl(rawUrl);
-  if (!url) throw new Error('不是有效的公众号文章链接。支持两种形式：'
-    + 'https://mp.weixin.qq.com/s/xxxxx 或 https://mp.weixin.qq.com/s?__biz=...&sn=...');
+// 微信偶尔会返回一个不含正文的壳页（环境校验、限流、或纯粹抖动）。
+// 本地连抓 5 次都是 1.4~3.9 秒、3.4MB 正常返回，但服务端偶发拿不到标题 ——
+// 所以这是间歇性的，重试一次基本就能过，不该让用户自己重贴。
+const FETCH_TRIES  = 3;
+const RETRY_DELAY  = 1200;
 
+function looksLikeShell(html) {
+  // 壳页只有几 KB，且没有正文容器
+  return html.length < 50000 && !html.includes('id="js_content"');
+}
+
+async function fetchOnce(url) {
   const res = await fetch(url, {
     headers: { 'User-Agent': UA },
     redirect: 'follow',
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) throw new Error(`抓取失败：HTTP ${res.status}`);
+  return res.text();
+}
 
-  const html = await res.text();
-  const parsed = parseArticlePage(html);
+async function fetchArticle(rawUrl) {
+  const url = canonicalUrl(rawUrl);
+  if (!url) throw new Error('不是有效的公众号文章链接。支持两种形式：'
+    + 'https://mp.weixin.qq.com/s/xxxxx 或 https://mp.weixin.qq.com/s?__biz=...&sn=...');
 
-  if (!parsed.title) {
-    // 链接缺 chksm、文章已删除、或被判定为环境异常时都会走到这里
-    throw new Error('页面里没找到文章标题。请确认链接完整（保留 chksm 参数）且文章未被删除');
+  let lastHtml = '', lastErr = null;
+  for (let t = 1; t <= FETCH_TRIES; t++) {
+    try {
+      lastHtml = await fetchOnce(url);
+      const parsed = parseArticlePage(lastHtml);
+      if (parsed.title) {
+        if (t > 1) console.log(`[MpArticle] 第 ${t} 次抓取成功`);
+        return { url, ...parsed };
+      }
+      lastErr = null;
+      console.log(`[MpArticle] 第 ${t}/${FETCH_TRIES} 次没拿到标题`
+        + `（${(lastHtml.length / 1024).toFixed(0)}KB${looksLikeShell(lastHtml) ? '，疑似壳页' : ''}），重试…`);
+    } catch (e) {
+      lastErr = e;
+      console.log(`[MpArticle] 第 ${t}/${FETCH_TRIES} 次抓取异常: ${e.message}`);
+    }
+    if (t < FETCH_TRIES) await new Promise(r => setTimeout(r, RETRY_DELAY * t));
   }
-  return { url, ...parsed };
+
+  if (lastErr) throw lastErr;
+
+  // 把「微信给了壳页」和「文章真的有问题」分开说，否则用户无从下手
+  if (looksLikeShell(lastHtml)) {
+    throw new Error(`微信没有返回文章正文（只有 ${(lastHtml.length / 1024).toFixed(0)}KB 的壳页），`
+      + `已重试 ${FETCH_TRIES} 次。多半是被临时限流，等一两分钟再试即可。`);
+  }
+  throw new Error('页面里没找到文章标题。请确认文章未被删除；'
+    + '若用的是长链接，注意保留 chksm 参数。');
 }
 
 module.exports = { canonicalUrl, parseArticlePage, htmlToText, fetchArticle };

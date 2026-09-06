@@ -105,3 +105,60 @@ test('canonicalUrl: 长链仍然照常工作', () => {
 test('canonicalUrl: 路径像短链但太短的不认', () => {
   assert.strictEqual(canonicalUrl('https://mp.weixin.qq.com/s/abc'), null);
 });
+
+// ── 抓取重试 ──
+// 微信偶发返回不含正文的壳页（限流或抖动）。本地连抓 5 次都正常，
+// 但服务端偶尔拿不到标题，所以要重试，不该让用户自己重贴。
+
+const { fetchArticle } = require('../mp-article');
+
+const SHELL = '<html><head><title>验证</title></head><body>请在微信客户端打开</body></html>';
+const GOOD  = `<script>var msg_title = '正常文章标题'; var msg_cdn_url = "https://mmbiz/x.jpg"; var ct = "1757059200";</script>
+  <div id="js_content" style="visibility:hidden"><p>正文内容</p></div>`;
+
+function fakeFetch(sequence) {
+  let i = 0;
+  return async () => {
+    const body = sequence[Math.min(i++, sequence.length - 1)];
+    if (body instanceof Error) throw body;
+    return { ok: true, status: 200, text: async () => body };
+  };
+}
+
+test('fetchArticle: 第一次拿到壳页时会重试', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = fakeFetch([SHELL, GOOD]);
+  try {
+    const a = await fetchArticle('https://mp.weixin.qq.com/s/abcdefghijk');
+    assert.strictEqual(a.title, '正常文章标题', '重试后应拿到正文');
+  } finally { globalThis.fetch = orig; }
+});
+
+test('fetchArticle: 一直是壳页时，错误里说清楚是限流而不是链接有问题', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = fakeFetch([SHELL]);
+  try {
+    await assert.rejects(
+      () => fetchArticle('https://mp.weixin.qq.com/s/abcdefghijk'),
+      e => /壳页/.test(e.message) && /限流/.test(e.message) && /重试/.test(e.message),
+    );
+  } finally { globalThis.fetch = orig; }
+});
+
+test('fetchArticle: 第一次就成功时不做多余重试', async () => {
+  const orig = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return { ok: true, status: 200, text: async () => GOOD }; };
+  try {
+    await fetchArticle('https://mp.weixin.qq.com/s/abcdefghijk');
+    assert.strictEqual(calls, 1, '成功就不该再打第二次');
+  } finally { globalThis.fetch = orig; }
+});
+
+test('fetchArticle: 网络异常也会重试，最终抛出原始错误', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = fakeFetch([new Error('网络中断')]);
+  try {
+    await assert.rejects(() => fetchArticle('https://mp.weixin.qq.com/s/abcdefghijk'), /网络中断/);
+  } finally { globalThis.fetch = orig; }
+});
