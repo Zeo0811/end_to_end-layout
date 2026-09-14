@@ -4,7 +4,7 @@ const crypto  = require('crypto');
 const path    = require('path');
 const db      = require('./db');
 const crawler = require('./parsers/crawler');
-const { formatToWechat, buildRecommendBlock } = require('./formatter');
+const { formatToWechat, buildRecommendBlock, buildMemberBlock } = require('./formatter');
 const { createClient }   = require('./wechat-api');
 const { recommend, extractEntities } = require('./recommender');
 const articleIndex = require('./article-index');
@@ -354,6 +354,9 @@ app.post('/api/publish', auth, async (req, res) => {
       }
     }
 
+    // 会员群固定加在最后。有推荐阅读时排在它下面，没有就直接接正文后面。
+    appendHtml += buildMemberBlock();
+
     sse.progress(4, 55, '正在排版格式化...');
     const html = formatToWechat(parsed, { appendHtml });
 
@@ -565,6 +568,13 @@ app.post('/api/fix-urls', auth, (req, res) => {
 // 所以复用不了 /api/prepare（那条会去爬页面，慢且可能因登录态拿不到内容）。
 // 也不能用 /api/publish —— 那条最后会建微信草稿，插件只是要一段 HTML。
 
+// 文末固定板块（目前是「加入会员群」）。插件在跳过推荐、拉取失败、
+// 没配密钥、无候选这几条路径上都不会调 recommend-html，所以单独开一个
+// 只读路由，保证任何情况下都能拿到。
+app.get('/api/tail-block', authOrKey, (req, res) => {
+  res.json({ html: buildMemberBlock() });
+});
+
 // 算推荐候选。纯计算，不碰浏览器，毫秒级。
 app.post('/api/recommend', authOrKey, (req, res) => {
   const { accountName, title, bodyText } = req.body;
@@ -600,7 +610,8 @@ app.post('/api/recommend-html', authOrKey, async (req, res) => {
   const { accountName, selectedIds } = req.body;
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
   const ids = Array.isArray(selectedIds) ? selectedIds : [];
-  if (ids.length === 0) return res.json({ html: '', count: 0 });
+  // 没选推荐也要给会员群板块
+  if (ids.length === 0) return res.json({ html: buildMemberBlock(), count: 0 });
   if (ids.length > 8)   return res.status(400).json({ error: '最多 8 篇' });
 
   try {
@@ -614,7 +625,8 @@ app.post('/api/recommend-html', authOrKey, async (req, res) => {
       coverUrl: a.thumbUrl,
     })));
     res.json({
-      html: buildRecommendBlock(cards),
+      // 会员群跟在推荐阅读下面，一起返回，插件不用关心拼接顺序
+      html: buildRecommendBlock(cards) + buildMemberBlock(),
       count: cards.length,
       skipped: chosen.length - cards.length,   // 封面取不到的
     });

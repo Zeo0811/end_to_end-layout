@@ -194,13 +194,14 @@ test('recommend: 缺标题时带 ok:false', async () => {
   assert.match(body.error, /标题/);
 });
 
-test('recommend-html: 没选任何篇时返回空串，不报错', async () => {
+test('recommend-html: 没选任何篇时不报错，且仍带上文末固定板块', async () => {
   const { status, body } = await post('/api/recommend-html',
     { accountName: '插件号', selectedIds: [] }, auth());
   assert.strictEqual(status, 200);
   assert.strictEqual(body.ok, true);
-  assert.strictEqual(body.html, '');
   assert.strictEqual(body.count, 0);
+  assert.ok(!body.html.includes('推荐阅读'), '没选就不该有推荐阅读');
+  assert.match(body.html, /加入会员群/, '会员群每篇都要有');
 });
 
 test('recommend-html: 超过 8 篇带 ok:false', async () => {
@@ -306,4 +307,21 @@ test('fix-urls: 不带 dropMissingChksm 时不删任何行', async () => {
   const { body } = await post('/api/fix-urls', { accountName: acc }, auth());
   assert.strictEqual(body.dropped, 0);
   assert.strictEqual(body.stats.published, 1);
+});
+
+// ── 文末固定板块 ──
+
+test('tail-block: 插件 key 能取到会员群板块', async () => {
+  const r = await fetch(BASE + '/api/tail-block', { headers: { 'X-Extension-Key': 'test-key-abc123' } });
+  const body = await r.json();
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(body.ok, true);
+  assert.match(body.html, /加入会员群/);
+});
+
+test('recommend-html: 一篇都没选时仍返回会员群板块', async () => {
+  const { body } = await post('/api/recommend-html', { accountName: '尾块号', selectedIds: [] }, auth());
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.count, 0);
+  assert.match(body.html, /加入会员群/, '没选推荐也要有会员群');
 });

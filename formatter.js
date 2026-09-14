@@ -116,6 +116,15 @@ const S = {
   recommend_wrapper: `display: block; margin: 0; padding-top: 30px; border-top: 1px solid rgba(0,0,0,.08);`,
   recommend_title:   `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 40px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
   recommend_img:     `width: 100%; max-width: 100%; height: auto; display: block; margin: 0 0 14px;`,
+
+  // 文末「加入会员群」板块。标题沿用 H1 语汇（与推荐阅读同级），
+  // 二维码居中，权益用无序列表。
+  member_wrapper:  `display: block; margin: 0;`,
+  member_title:    `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 40px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
+  member_qr_wrap:  `display: block; text-align: center; margin: 0 0 30px;`,
+  member_qr:       `max-width: 100%; height: auto; display: inline-block;`,
+  member_lead:     `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; margin: 0 0 30px; text-align: left;`,
+  member_sub:      `display: block; font-size: ${WX_SIZE}; line-height: ${WX_P_LH}; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: ${WX_COLOR}; font-weight: bold; margin: 0 0 10px; text-align: left;`,
 };
 
 function applyS(key, content, defaultTag = 'section') {
@@ -411,4 +420,39 @@ function buildRecommendBlock(cards) {
 
 // WX_FONT / WX_COLOR 等一并导出：card-renderer.js 渲染卡片时要用同一套，
 // 两边各写一份迟早会漂。
-module.exports = { formatToWechat, buildRecommendBlock, WX_FONT, WX_SIZE, WX_COLOR, WX_LS };
+// 文末「加入会员群」板块。每篇都加，固定内容。
+//
+// 二维码写死用参考文章里那张 mmbiz 图：端到端发布时 processHtmlImages
+// 会自动把它转存到自己的素材库；插件粘贴时会转成 base64。
+// 换群或二维码过期时改这里的 MEMBER_QR 即可。
+const MEMBER_QR = 'https://mmbiz.qpic.cn/sz_mmbiz_png/a16Y4PLxPql46c5hPug7SEMVhzFDicBsjXkb8BIHoXKKQChoOeThMXzHrD2JRfBOVVvIG0STLic9jUJ8MfT0AdKQrWvBLKLg2Xia54wpehoXoQ/640?wx_fmt=png&from=appmsg';
+
+const MEMBER_LEAD = '「十字路口」一直致力于成为这个 AI 黄金时代的创业者连接中枢，'
+  + '打造一个让你们在关键时刻相遇、交流和决策的平台。'
+  + '欢迎积极行动的创业者、PM、开发者和超级个体们加入我们的微信会员群。';
+
+const MEMBER_BENEFITS = [
+  '深度参与 AI 研发与产品经验交流',
+  '直接对接领先大模型与云服务供应商',
+  '获得十字路口平台的媒体曝光机会',
+  '快速对接 AI 领域顶尖投资机构',
+  '优先参与 AI Hacker House (上海漕河泾) 的活动与服务',
+];
+
+function buildMemberBlock() {
+  const items = MEMBER_BENEFITS
+    .map(t => `<li style="${S.li_ul}"><section style="${S.li_p}">${escHtml(t)}</section></li>`)
+    .join('');
+
+  return `<section style="${S.member_wrapper}">`
+    + `<section style="${S.member_title}">加入会员群</section>`
+    + `<section style="${S.member_lead}">${escHtml(MEMBER_LEAD)}</section>`
+    + `<section style="${S.member_qr_wrap}">`
+    +   `<img src="${escAttr(MEMBER_QR)}" alt="加入会员群二维码" style="${S.member_qr}">`
+    + `</section>`
+    + `<section style="${S.member_sub}">加入会员群后，你将获得</section>`
+    + `<ul style="${S.ul}">${items}</ul>`
+    + `</section>`;
+}
+
+module.exports = { formatToWechat, buildRecommendBlock, buildMemberBlock, WX_FONT, WX_SIZE, WX_COLOR, WX_LS };
