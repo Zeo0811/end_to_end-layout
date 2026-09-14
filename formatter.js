@@ -68,7 +68,7 @@ const S = {
   code_inline: `background: rgba(135,131,120,.15); border-radius: 4px; font-size: 85%; padding: 0.2em 0.4em; color: #222222; font-family: ${MONO};`,
   s: `text-decoration: line-through; color: #888888;`,
 
-  blockquote_wrapper: `line-height: ${WX_P_LH}; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 0 0 30px; border-left: 2px solid #327848; background-color: #f5f5f5; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #327848; font-size: ${WX_SIZE};`,
+  blockquote_wrapper: `line-height: ${WX_P_LH}; word-spacing: normal; hyphens: auto; text-align: left; outline: 0; max-width: 100%; border-top: none; border-right: none; border-bottom: none; display: block; overflow: auto; padding: 10px; margin: 0 0 30px; border-left: 2px solid #327848; background-color: #f7faf8; font-family: ${WX_FONT}; letter-spacing: ${WX_LS}; color: #327848; font-size: ${WX_SIZE};`,
 
   callout_wrapper: `font-size: ${WX_SIZE}; white-space: normal; margin: 0 0 30px; color: ${WX_COLOR}; font-family: ${WX_FONT}; line-height: ${WX_P_LH}; letter-spacing: ${WX_LS}; background-color: #f7faf8; border: 1px solid #327848; padding: 16px 20px;`,
   callout_content: ``,
