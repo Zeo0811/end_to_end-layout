@@ -4,7 +4,7 @@ const crypto  = require('crypto');
 const path    = require('path');
 const db      = require('./db');
 const crawler = require('./parsers/crawler');
-const { formatToWechat, buildRecommendBlock, buildMemberBlock } = require('./formatter');
+const { formatToWechat, buildRecommendBlock, buildMemberBlock, MEMBER_ARTICLE } = require('./formatter');
 const { createClient }   = require('./wechat-api');
 const { recommend, extractEntities } = require('./recommender');
 const articleIndex = require('./article-index');
@@ -48,6 +48,44 @@ function getWechatClient(accountName) {
   const client = createClient(account.app_id, account.app_secret);
   clientCache.set(accountName, client);
   return client;
+}
+
+// ── 会员群卡片缓存 ──
+// 内容固定（标题/封面/日期都写死在 MEMBER_ARTICLE），合成一次就够了，
+// 不必每篇文章都去下封面 + 开浏览器截图。
+let memberBlockCache = null;
+
+async function getMemberBlock() {
+  if (memberBlockCache !== null) return memberBlockCache;
+  try {
+    // 标题/封面/日期实时从那篇文章抓，抓不到才用写死的兜底值。
+    // 这样文章换了封面或改了标题不用动代码 —— 写死的 URL 是唯一真相。
+    let info = MEMBER_ARTICLE;
+    try {
+      const live = await mpArticle.fetchArticle(MEMBER_ARTICLE.url);
+      if (live && live.title && live.thumbUrl) {
+        info = { url: live.url, title: live.title, coverUrl: live.thumbUrl,
+                 publishedAt: String(live.publishedAt || '').slice(0, 10) || MEMBER_ARTICLE.publishedAt };
+        console.log(`[Member] 已取到最新文章信息：${info.title}`);
+      }
+    } catch (e) {
+      console.warn('[Member] 实时抓取失败，改用内置信息:', e.message);
+    }
+
+    const cards = await renderCards([{
+      title:    info.title,
+      url:      info.url,
+      date:     info.publishedAt.replace(/-/g, '.'),
+      coverUrl: info.coverUrl,
+    }]);
+    memberBlockCache = buildMemberBlock(cards[0]);
+    if (memberBlockCache) console.log('[Member] 会员群卡片已合成并缓存');
+    else console.warn('[Member] 卡片合成失败（多半是封面取不到），本次跳过会员群');
+  } catch (e) {
+    console.error('[Member] 合成异常:', e.message);
+    memberBlockCache = '';   // 记成空串，避免每篇都重试拖慢发布
+  }
+  return memberBlockCache;
 }
 
 // ── prepare 缓存 ──
@@ -355,7 +393,7 @@ app.post('/api/publish', auth, async (req, res) => {
     }
 
     // 会员群固定加在最后。有推荐阅读时排在它下面，没有就直接接正文后面。
-    appendHtml += buildMemberBlock();
+    appendHtml += await getMemberBlock();
 
     sse.progress(4, 55, '正在排版格式化...');
     const html = formatToWechat(parsed, { appendHtml });
@@ -571,8 +609,8 @@ app.post('/api/fix-urls', auth, (req, res) => {
 // 文末固定板块（目前是「加入会员群」）。插件在跳过推荐、拉取失败、
 // 没配密钥、无候选这几条路径上都不会调 recommend-html，所以单独开一个
 // 只读路由，保证任何情况下都能拿到。
-app.get('/api/tail-block', authOrKey, (req, res) => {
-  res.json({ html: buildMemberBlock() });
+app.get('/api/tail-block', authOrKey, async (req, res) => {
+  res.json({ html: await getMemberBlock() });
 });
 
 // 算推荐候选。纯计算，不碰浏览器，毫秒级。
@@ -611,7 +649,7 @@ app.post('/api/recommend-html', authOrKey, async (req, res) => {
   if (!accountName) return res.status(400).json({ error: '请选择公众号' });
   const ids = Array.isArray(selectedIds) ? selectedIds : [];
   // 没选推荐也要给会员群板块
-  if (ids.length === 0) return res.json({ html: buildMemberBlock(), count: 0 });
+  if (ids.length === 0) return res.json({ html: await getMemberBlock(), count: 0 });
   if (ids.length > 8)   return res.status(400).json({ error: '最多 8 篇' });
 
   try {
@@ -626,7 +664,7 @@ app.post('/api/recommend-html', authOrKey, async (req, res) => {
     })));
     res.json({
       // 会员群跟在推荐阅读下面，一起返回，插件不用关心拼接顺序
-      html: buildRecommendBlock(cards) + buildMemberBlock(),
+      html: buildRecommendBlock(cards) + await getMemberBlock(),
       count: cards.length,
       skipped: chosen.length - cards.length,   // 封面取不到的
     });
