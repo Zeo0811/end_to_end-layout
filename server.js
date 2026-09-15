@@ -75,8 +75,9 @@ async function getMemberBlock() {
     const cards = await renderCards([{
       title:    info.title,
       url:      info.url,
-      date:     info.publishedAt.replace(/-/g, '.'),
       coverUrl: info.coverUrl,
+      // 会员群卡片不显示日期 —— 它是常驻入口，不是时效性内容
+      button:   '免费入群 \u203a',
     }]);
     memberBlockCache = buildMemberBlock(cards[0]);
     if (memberBlockCache) console.log('[Member] 会员群卡片已合成并缓存');

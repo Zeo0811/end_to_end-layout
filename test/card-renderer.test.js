@@ -105,3 +105,39 @@ test('renderCards: 跳过取不到封面的条目', async () => {
   assert.strictEqual(cards[0].url, 'https://mp/1');
   assert.ok(cards[0].dataUri.startsWith('data:image/jpeg;base64,'));
 });
+
+// ── 封面上的行动按钮（会员群卡片用）──
+
+test('buildCardHtml: 传 button 时压在封面右侧、垂直居中', () => {
+  const h = buildCardHtml({ title: '标题', coverDataUri: RED, button: '免费入群 ›' });
+  assert.match(h, /免费入群/);
+  assert.ok(h.includes('class="coverwrap"'), '封面要有定位容器');
+  assert.ok(h.includes('position: absolute'), '按钮绝对定位');
+  assert.ok(h.includes('right: 22px'), '靠右');
+  assert.ok(h.includes('translateY(-50%)'), '垂直居中');
+  assert.ok(h.includes('#327848'), '品牌绿');
+  assert.ok(!/border-radius/.test(h), '直角，与 callout/图片去圆角一致');
+});
+
+test('buildCardHtml: 不传 button 时没有按钮，推荐阅读卡片不受影响', () => {
+  const h = buildCardHtml({ title: '标题', date: '2025.01.01', coverDataUri: RED });
+  assert.ok(!h.includes('class="btn"'));
+  assert.match(h, /2025\.01\.01/, '日期照常显示');
+});
+
+test('buildCardHtml: 不传 date 时不画日期行', () => {
+  const h = buildCardHtml({ title: '标题', coverDataUri: RED, button: '免费入群' });
+  assert.ok(!h.includes('class="meta"'));
+});
+
+test('buildCardHtml: 按钮文字被转义', () => {
+  const h = buildCardHtml({ title: 'x', coverDataUri: RED, button: '<script>y</script>' });
+  assert.ok(h.includes('&lt;script&gt;'));
+  assert.ok(!h.includes('<script>y</script>'));
+});
+
+test('renderCard: 带按钮能正常出图', async () => {
+  const uri = await renderCard({ title: '会员群标题', coverDataUri: RED, button: '免费入群 ›' });
+  assert.ok(uri && uri.startsWith('data:image/jpeg;base64,'));
+  assert.ok(uri.length > 2000);
+});

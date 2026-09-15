@@ -93,9 +93,14 @@ async function fetchImageAsDataUri(url) {
 }
 
 // 方案 3：上图下字，绿底白字
-function buildCardHtml({ title, date, coverDataUri }) {
+// button: 可选，压在封面右侧留白上的行动按钮（会员群卡片用）。
+// 推荐阅读的卡片不传，保持原样。
+function buildCardHtml({ title, date, coverDataUri, button }) {
+  const btn = button
+    ? `<span class="btn">${esc(button)}</span>`
+    : '';
   const cover = coverDataUri
-    ? `<img class="cover" src="${coverDataUri}">`
+    ? `<div class="coverwrap"><img class="cover" src="${coverDataUri}">${btn}</div>`
     : '';
   const meta = date
     ? `<div class="meta">${esc(date)}</div>`
@@ -105,7 +110,15 @@ function buildCardHtml({ title, date, coverDataUri }) {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #fff; font-family: ${FONT}; }
   .card { width: ${CARD_WIDTH_PT}px; background: ${GREEN}; overflow: hidden; }
+  .coverwrap { position: relative; line-height: 0; }
   .cover { width: ${CARD_WIDTH_PT}px; height: ${COVER_HEIGHT_PT}px; object-fit: cover; object-position: center; display: block; }
+  /* 行动按钮：压在封面右侧留白，垂直居中。直角，与 callout/图片去圆角一致 */
+  .btn {
+    position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
+    background: ${GREEN}; color: #fff; font-weight: 600; font-size: 15px;
+    letter-spacing: ${WX_LS}; line-height: 1; white-space: nowrap;
+    display: inline-block; padding: 13px 24px;
+  }
   .bar { padding: ${PAD_Y}px ${PAD_X}px; }
   .title {
     font-size: ${TITLE_PX}px; line-height: 1.6; color: #fff; font-weight: 600;
@@ -143,7 +156,7 @@ async function probeFonts(page) {
   } catch (_) { /* 探测失败不影响出图 */ }
 }
 
-async function renderCard({ title, date, coverUrl, coverDataUri }) {
+async function renderCard({ title, date, coverUrl, coverDataUri, button }) {
   const cover = coverDataUri !== undefined ? coverDataUri : await fetchImageAsDataUri(coverUrl);
   if (!cover) return null; // 没有封面就不出卡片，不做无图降级
 
@@ -154,7 +167,7 @@ async function renderCard({ title, date, coverUrl, coverDataUri }) {
   });
   try {
     const page = await context.newPage();
-    await page.setContent(buildCardHtml({ title, date, coverDataUri: cover }), { waitUntil: 'load' });
+    await page.setContent(buildCardHtml({ title, date, coverDataUri: cover, button }), { waitUntil: 'load' });
     await probeFonts(page);
     const buf = await page.locator('.card').screenshot({ type: 'jpeg', quality: JPEG_QUALITY });
     return `data:image/jpeg;base64,${buf.toString('base64')}`;
