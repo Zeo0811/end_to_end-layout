@@ -388,75 +388,6 @@ function pickDate(raw) {
   return m ? `${m[1]}.${m[2]}.${m[3]}` : '';
 }
 
-// ── 微信内链 ──
-//
-// 微信在「群发」那一刻会把正文里它不认识的 <a> 规范化成 <span leaf="">，
-// 链接就没了。草稿和预览都不走这道处理，所以问题只在发布之后才暴露。
-//
-// 2026-09 实测：同一份 HTML，网页端发布链接保留，手机端发布被剥。
-// 把网页端发出来的文章抓回来看，微信把我们的 <a href="短链"> 补成了：
-//   <a target="_blank" style="" textvalue="" linktype="text" data-linktype="2"
-//      href="…/s?__biz=…&mid=…&idx=…&sn=…&chksm=…&scene=21#wechat_redirect">
-// 这套属性加规范长链就是微信自己认的形态。手机端没有这个补全步骤，
-// 所以我们提前写成它认的样子。
-const WX_LINK_ATTRS = 'target="_blank" style="" textvalue="" linktype="text" data-linktype="2"';
-
-// href 里的 & 必须写成 &amp;。长链带 &mid=，而 mid 正好是个合法 HTML 实体名，
-// 交给不同的解析器有被吃掉的风险；微信自己生成的链接也一律是 &amp; 形式。
-function escHref(url) {
-  return String(url || '').replace(/&amp;/g, '&').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
-// 微信编辑器插入文章链接时会补上 scene=21 和 #wechat_redirect。
-// 只对长链补；短链 /s/<hash> 本来就没这两段，保持原样。
-function wxCanonicalHref(url) {
-  const u = String(url || '').trim();
-  if (!/^https?:\/\/mp\.weixin\.qq\.com\/s\?/.test(u)) return u;
-  if (/#wechat_redirect$/.test(u)) return u;
-  const base = u.replace(/#.*$/, '');
-  return `${base}${/[?&]scene=/.test(base) ? '' : '&scene=21'}#wechat_redirect`;
-}
-
-// 属性和长链在微信发出来的 HTML 里是同时出现的，光读没法分辨哪个起决定作用。
-// 需要分辨时打开 WX_LINK_AB=1，每张卡片换一种写法发一篇，抓回来看谁活着。
-// 默认关。目标是手机端不丢链接，不是做实验，所以每张卡片都用最完整的写法。
-// 万一手机端还是剥，再 WX_LINK_AB=1 打开，靠一次推送分辨是属性还是链接形式的问题。
-const AB_ON = typeof process !== 'undefined' && process.env
-  ? process.env.WX_LINK_AB === '1'
-  : false;
-
-// 会员群那张固定用 full，这里只排另外三种。
-//
-// 按卡片下标轮转不行：短链没有 scene=21 可补，href-only 落在短链上和 bare
-// 完全一样，那一格就白占了，而且长短混排时会把某一种整个挤掉。
-// 所以先整体排布 —— href-only 优先占一个长链位，剩下的再铺。
-function planVariants(urls) {
-  const isLong = u => /^https?:\/\/mp\.weixin\.qq\.com\/s\?/.test(String(u || ''));
-  const plan = new Array(urls.length).fill(null);
-
-  const longIdx = urls.findIndex(isLong);
-  if (longIdx !== -1) plan[longIdx] = 'href-only';
-
-  const rest = ['attrs-only', 'bare'];
-  let k = 0;
-  for (let i = 0; i < plan.length; i++) {
-    if (!plan[i]) plan[i] = rest[k++ % rest.length];
-  }
-  return plan;
-}
-
-function openLink(url, variant) {
-  switch (variant) {
-    // 只补属性，链接保持原样：验证「属性是否足够」
-    case 'attrs-only': return `<a ${WX_LINK_ATTRS} href="${escHref(url)}">`;
-    // 只补长链，不加属性：验证「链接形式是否足够」
-    case 'href-only':  return `<a href="${escHref(wxCanonicalHref(url))}">`;
-    // 现状，作对照组
-    case 'bare':       return `<a href="${escHref(url)}">`;
-    default:           return `<a ${WX_LINK_ATTRS} href="${escHref(wxCanonicalHref(url))}">`;
-  }
-}
-
 // 文末「推荐阅读」板块。cards 为空时返回空串，整个板块不出现。
 //
 // 每张卡片是一张合成好的 JPEG（card-renderer.js 出的 data URI），外面套一个 <a>。
@@ -470,10 +401,8 @@ function openLink(url, variant) {
 function buildRecommendBlock(cards) {
   if (!Array.isArray(cards) || cards.length === 0) return '';
 
-  // A/B 期间每张卡片换一种写法，发布后抓回来看谁活着。
-  const plan = AB_ON ? planVariants(cards.map(c => c.url)) : null;
-  const items = cards.map((c, i) =>
-    openLink(c.url, plan ? plan[i] : 'full')
+  const items = cards.map(c =>
+    `<a href="${escAttr(c.url)}">`
     + `<img src="${escAttr(c.dataUri)}" alt="${escHtml(c.title)}" style="${S.recommend_img}">`
     + `</a>`
   ).join('');
@@ -509,10 +438,10 @@ function buildMemberBlock(card) {
   if (!card || !card.dataUri) return '';
   return `<section style="${S.member_wrapper}">`
     + `<section style="${S.member_title}">加入会员群</section>`
-    + openLink(card.url, 'full')
+    + `<a href="${escAttr(card.url)}">`
     +   `<img src="${escAttr(card.dataUri)}" alt="${escHtml(card.title)}" style="${S.recommend_img}">`
     + `</a>`
     + `</section>`;
 }
 
-module.exports = { formatToWechat, buildRecommendBlock, buildMemberBlock, planVariants, wxCanonicalHref, MEMBER_ARTICLE, WX_FONT, WX_SIZE, WX_COLOR, WX_LS };
+module.exports = { formatToWechat, buildRecommendBlock, buildMemberBlock, MEMBER_ARTICLE, WX_FONT, WX_SIZE, WX_COLOR, WX_LS };

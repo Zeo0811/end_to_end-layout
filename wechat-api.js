@@ -331,23 +331,6 @@ function createClient(appId, appSecret) {
     });
   }
 
-  // 列草稿箱，连正文一起取回。
-  // 微信会改我们的 HTML 两次：保存草稿时一次、发布时又一次。
-  // 只看发布结果分不清是哪一步动的手，所以要能把草稿原样读回来比对。
-  async function listDrafts(offset = 0, count = 5) {
-    return apiCallWithRetry(async () => {
-      const token = await getAccessToken();
-      const url   = `https://api.weixin.qq.com/cgi-bin/draft/batchget?access_token=${token}`;
-      const res = await fetch(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ offset, count, no_content: 0 }),
-      });
-      const data = await res.json();
-      if (data.errcode) throw new Error(`拉取草稿箱失败: [${data.errcode}] ${data.errmsg}`);
-      return data;
-    });
-  }
-
   async function deleteDraft(mediaId) {
     return apiCallWithRetry(async () => {
       const token = await getAccessToken();
@@ -424,7 +407,6 @@ function createClient(appId, appSecret) {
     processHtmlImages,
     processHtmlVideos,
     publishArticle,
-    listDrafts,
   };
 }
 

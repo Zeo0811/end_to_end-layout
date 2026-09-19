@@ -55,13 +55,6 @@ function getWechatClient(accountName) {
 // 不必每篇文章都去下封面 + 开浏览器截图。
 let memberBlockCache = null;
 
-// 短链 /s/<hash> 在手机端发布时不被微信识别，<a> 会被整个换成 <span leaf="">。
-// 换成微信自己那套 /s?__biz=…&scene=21#wechat_redirect 再给卡片用。
-// 还原失败就沿用原链接，不阻断发布。
-async function withJumpUrls(items) {
-  return Promise.all(items.map(async it => ({ ...it, url: await mpArticle.toJumpUrl(it.url) })));
-}
-
 async function getMemberBlock() {
   if (memberBlockCache !== null) return memberBlockCache;
   try {
@@ -71,7 +64,7 @@ async function getMemberBlock() {
     try {
       const live = await mpArticle.fetchArticle(MEMBER_ARTICLE.url);
       if (live && live.title && live.thumbUrl) {
-        info = { url: live.jumpUrl || live.url, title: live.title, coverUrl: live.thumbUrl,
+        info = { url: live.url, title: live.title, coverUrl: live.thumbUrl,
                  publishedAt: String(live.publishedAt || '').slice(0, 10) || MEMBER_ARTICLE.publishedAt };
         console.log(`[Member] 已取到最新文章信息：${info.title}`);
       }
@@ -81,7 +74,7 @@ async function getMemberBlock() {
 
     const cards = await renderCards([{
       title:    info.title,
-      url:      await mpArticle.toJumpUrl(info.url),
+      url:      info.url,
       coverUrl: info.coverUrl,
       // 会员群卡片不显示日期 —— 它是常驻入口，不是时效性内容
       button:   '免费入群 \u203a',
@@ -385,12 +378,11 @@ app.post('/api/publish', auth, async (req, res) => {
         const pool   = db.listPublishedArticles(accountName);
         // 按用户勾选的顺序保留，pool 里找不到的（已删除）跳过
         const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
-        const cards  = await renderCards(await withJumpUrls(chosen.map(a => ({
+        const cards  = await renderCards(chosen.map(a => ({
           title: a.title,
-          url:   a.url,
           date:  String(a.publishedAt || '').slice(0, 10).replace(/-/g, '.'),
           coverUrl: a.thumbUrl,
-        }))));
+        })).map((x, i) => ({ ...x, url: chosen[i].url })));
         appendHtml = buildRecommendBlock(cards);
         if (cards.length < chosen.length) {
           sse.progress(3, 50, `${chosen.length - cards.length} 篇因封面取不到被跳过`);
@@ -665,12 +657,12 @@ app.post('/api/recommend-html', authOrKey, async (req, res) => {
     const pool   = db.listPublishedArticles(accountName);
     // 按传入顺序保留，pool 里找不到的（已删除）跳过
     const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
-    const cards  = await renderCards(await withJumpUrls(chosen.map(a => ({
+    const cards  = await renderCards(chosen.map(a => ({
       title: a.title,
       url:   a.url,
       date:  String(a.publishedAt || '').slice(0, 10).replace(/-/g, '.'),
       coverUrl: a.thumbUrl,
-    }))));
+    })));
     res.json({
       // 会员群跟在推荐阅读下面，一起返回，插件不用关心拼接顺序
       html: buildRecommendBlock(cards) + await getMemberBlock(),
@@ -693,39 +685,6 @@ app.post('/api/draft-html', auth, async (req, res) => {
     const data   = await client.getDraft(mediaId);
     const item   = (data.news_item || [])[0] || {};
     res.json({ title: item.title || '', content: item.content || '' });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-// 草稿箱诊断：把草稿正文里每个 <a> 的形态摘出来。
-//
-// 微信会改我们的 HTML 两次 —— 在编辑器里保存草稿时一次，发布时又一次。
-// 只看发布出来的文章分不清链接是哪一步丢的，所以要能读草稿。
-app.get('/api/drafts', auth, adminOnly, async (req, res) => {
-  const { accountName } = req.query;
-  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
-  const count = Math.min(Number(req.query.count) || 3, 10);
-  try {
-    const data = await getWechatClient(accountName).listDrafts(0, count);
-    const items = (data.item || []).map(it => {
-      const news = (it.content && it.content.news_item) || [];
-      return {
-        mediaId:    it.media_id,
-        updatedAt:  it.content && it.content.update_time,
-        articles: news.map(n => {
-          const html = n.content || '';
-          return {
-            title: n.title,
-            // 正文里每个 <a> 的开标签，属性原样保留
-            links: (html.match(/<a\s[^>]*>/gi) || []).map(a => a.slice(0, 400)),
-            imgInSpanLeaf: (html.match(/<span leaf="">\s*<img/gi) || []).length,
-            imgTotal:      (html.match(/<img\s/gi) || []).length,
-          };
-        }),
-      };
-    });
-    res.json({ total: data.total_count, items });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
