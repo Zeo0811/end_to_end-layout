@@ -103,7 +103,7 @@ test('管线：召回结果合成卡片后落进正文 wrapper 之内', async ()
   // 板块必须在最外层 wrapper 之内，否则丢基础字体字色
   assert.ok(html.indexOf('推荐阅读') < html.lastIndexOf('</section>'), '推荐板块跑到 wrapper 外面了');
   // 两篇各一个链接、各一张图
-  const links = html.match(/<a href="(https:\/\/mp\.weixin\.qq\.com\/s\/[^"]+)"/g) || [];
+  const links = html.match(/<a [^>]*href="(https:\/\/mp\.weixin\.qq\.com\/s[^"]+)"/g) || [];
   assert.strictEqual(new Set(links).size, 2, '应指向两篇不同的文章');
   assert.strictEqual((html.match(/<img /g) || []).length, 2);
 });
