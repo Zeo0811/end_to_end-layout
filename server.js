@@ -698,6 +698,39 @@ app.post('/api/draft-html', auth, async (req, res) => {
   }
 });
 
+// 草稿箱诊断：把草稿正文里每个 <a> 的形态摘出来。
+//
+// 微信会改我们的 HTML 两次 —— 在编辑器里保存草稿时一次，发布时又一次。
+// 只看发布出来的文章分不清链接是哪一步丢的，所以要能读草稿。
+app.get('/api/drafts', auth, adminOnly, async (req, res) => {
+  const { accountName } = req.query;
+  if (!accountName) return res.status(400).json({ error: '请选择公众号' });
+  const count = Math.min(Number(req.query.count) || 3, 10);
+  try {
+    const data = await getWechatClient(accountName).listDrafts(0, count);
+    const items = (data.item || []).map(it => {
+      const news = (it.content && it.content.news_item) || [];
+      return {
+        mediaId:    it.media_id,
+        updatedAt:  it.content && it.content.update_time,
+        articles: news.map(n => {
+          const html = n.content || '';
+          return {
+            title: n.title,
+            // 正文里每个 <a> 的开标签，属性原样保留
+            links: (html.match(/<a\s[^>]*>/gi) || []).map(a => a.slice(0, 400)),
+            imgInSpanLeaf: (html.match(/<span leaf="">\s*<img/gi) || []).length,
+            imgTotal:      (html.match(/<img\s/gi) || []).length,
+          };
+        }),
+      };
+    });
+    res.json({ total: data.total_count, items });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // 接口权限诊断：把微信那边的真实情况打出来，避免靠猜。
 app.post('/api/probe-wechat', auth, async (req, res) => {
   const { accountName } = req.body;
