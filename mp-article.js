@@ -110,6 +110,53 @@ async function fetchOnce(url) {
   return res.text();
 }
 
+// ── 微信自己那套跳转链 ──
+//
+// 微信在正文里插入文章链接时，生成的一律是这个形态：
+//   /s?__biz=…&mid=…&idx=…&sn=…&scene=21#wechat_redirect
+// 注意不带 chksm —— 带不带都能跳，微信自己生成的就不带。
+//
+// 短链 /s/<hash> 不是这个形态。网页端发布时编辑器会帮我们换过去，
+// 手机端没有这一步，于是 <a> 不被识别，整个被规范化成 <span leaf="">。
+// 好在这四个参数在文章页里都埋着，可以自己还原出来。
+const JUMP_KEYS = ['biz', 'mid', 'idx', 'sn'];
+
+function jumpUrlFromPage(html) {
+  const v = {};
+  for (const k of JUMP_KEYS) {
+    const m = String(html || '').match(new RegExp(`var\\s+${k}\\s*=\\s*["']([^"']*)["']`));
+    const val = m && m[1].trim();
+    if (!val) return null;
+    v[k] = val;
+  }
+  // 手工拼接，不用 URLSearchParams —— 它会把 __biz 末尾的 == 编码成 %3D%3D，
+  // 微信认不出来会 302 到「未知错误」页
+  return `https://mp.weixin.qq.com/s?__biz=${v.biz}&mid=${v.mid}&idx=${v.idx}&sn=${v.sn}`
+    + '&scene=21#wechat_redirect';
+}
+
+// 已经是长链的直接补后缀；短链才需要抓一次页面还原。
+// 结果进内存缓存 —— 同一篇文章会被反复推荐，不必每次都抓。
+const jumpCache = new Map();
+
+async function toJumpUrl(rawUrl) {
+  const url = canonicalUrl(rawUrl);
+  if (!url) return rawUrl;
+  if (url.includes('/s?')) {
+    return /#wechat_redirect$/.test(url) ? url : `${url}&scene=21#wechat_redirect`;
+  }
+  if (jumpCache.has(url)) return jumpCache.get(url);
+  try {
+    const jump = jumpUrlFromPage(await fetchOnce(url));
+    // 还原不出来就退回原链接，不阻断发布
+    jumpCache.set(url, jump || url);
+  } catch (e) {
+    console.warn('[MpArticle] 短链还原失败，沿用原链接:', url.slice(-24), e.message);
+    jumpCache.set(url, url);
+  }
+  return jumpCache.get(url);
+}
+
 async function fetchArticle(rawUrl) {
   const url = canonicalUrl(rawUrl);
   if (!url) throw new Error('不是有效的公众号文章链接。支持两种形式：'
@@ -122,7 +169,7 @@ async function fetchArticle(rawUrl) {
       const parsed = parseArticlePage(lastHtml);
       if (parsed.title) {
         if (t > 1) console.log(`[MpArticle] 第 ${t} 次抓取成功`);
-        return { url, ...parsed };
+        return { url, jumpUrl: jumpUrlFromPage(lastHtml) || url, ...parsed };
       }
       lastErr = null;
       console.log(`[MpArticle] 第 ${t}/${FETCH_TRIES} 次没拿到标题`
@@ -145,4 +192,5 @@ async function fetchArticle(rawUrl) {
     + '若用的是长链接，注意保留 chksm 参数。');
 }
 
-module.exports = { canonicalUrl, parseArticlePage, htmlToText, fetchArticle };
+module.exports = { canonicalUrl, parseArticlePage, htmlToText, fetchArticle,
+  jumpUrlFromPage, toJumpUrl };

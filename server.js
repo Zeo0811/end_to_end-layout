@@ -55,6 +55,13 @@ function getWechatClient(accountName) {
 // 不必每篇文章都去下封面 + 开浏览器截图。
 let memberBlockCache = null;
 
+// 短链 /s/<hash> 在手机端发布时不被微信识别，<a> 会被整个换成 <span leaf="">。
+// 换成微信自己那套 /s?__biz=…&scene=21#wechat_redirect 再给卡片用。
+// 还原失败就沿用原链接，不阻断发布。
+async function withJumpUrls(items) {
+  return Promise.all(items.map(async it => ({ ...it, url: await mpArticle.toJumpUrl(it.url) })));
+}
+
 async function getMemberBlock() {
   if (memberBlockCache !== null) return memberBlockCache;
   try {
@@ -64,7 +71,7 @@ async function getMemberBlock() {
     try {
       const live = await mpArticle.fetchArticle(MEMBER_ARTICLE.url);
       if (live && live.title && live.thumbUrl) {
-        info = { url: live.url, title: live.title, coverUrl: live.thumbUrl,
+        info = { url: live.jumpUrl || live.url, title: live.title, coverUrl: live.thumbUrl,
                  publishedAt: String(live.publishedAt || '').slice(0, 10) || MEMBER_ARTICLE.publishedAt };
         console.log(`[Member] 已取到最新文章信息：${info.title}`);
       }
@@ -74,7 +81,7 @@ async function getMemberBlock() {
 
     const cards = await renderCards([{
       title:    info.title,
-      url:      info.url,
+      url:      await mpArticle.toJumpUrl(info.url),
       coverUrl: info.coverUrl,
       // 会员群卡片不显示日期 —— 它是常驻入口，不是时效性内容
       button:   '免费入群 \u203a',
@@ -378,11 +385,12 @@ app.post('/api/publish', auth, async (req, res) => {
         const pool   = db.listPublishedArticles(accountName);
         // 按用户勾选的顺序保留，pool 里找不到的（已删除）跳过
         const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
-        const cards  = await renderCards(chosen.map(a => ({
+        const cards  = await renderCards(await withJumpUrls(chosen.map(a => ({
           title: a.title,
+          url:   a.url,
           date:  String(a.publishedAt || '').slice(0, 10).replace(/-/g, '.'),
           coverUrl: a.thumbUrl,
-        })).map((x, i) => ({ ...x, url: chosen[i].url })));
+        }))));
         appendHtml = buildRecommendBlock(cards);
         if (cards.length < chosen.length) {
           sse.progress(3, 50, `${chosen.length - cards.length} 篇因封面取不到被跳过`);
@@ -657,12 +665,12 @@ app.post('/api/recommend-html', authOrKey, async (req, res) => {
     const pool   = db.listPublishedArticles(accountName);
     // 按传入顺序保留，pool 里找不到的（已删除）跳过
     const chosen = ids.map(id => pool.find(a => a.id === id)).filter(Boolean);
-    const cards  = await renderCards(chosen.map(a => ({
+    const cards  = await renderCards(await withJumpUrls(chosen.map(a => ({
       title: a.title,
       url:   a.url,
       date:  String(a.publishedAt || '').slice(0, 10).replace(/-/g, '.'),
       coverUrl: a.thumbUrl,
-    })));
+    }))));
     res.json({
       // 会员群跟在推荐阅读下面，一起返回，插件不用关心拼接顺序
       html: buildRecommendBlock(cards) + await getMemberBlock(),

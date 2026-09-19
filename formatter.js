@@ -417,12 +417,12 @@ function wxCanonicalHref(url) {
   return `${base}${/[?&]scene=/.test(base) ? '' : '&scene=21'}#wechat_redirect`;
 }
 
-// 手机端到底认哪一种写法，光靠读微信发出来的 HTML 分辨不了 ——
-// 属性和长链是同时出现的，没法知道是哪个起决定作用。
-// 所以下一次真实推送里每张卡片用一种写法，发完抓回来看谁活着。
-// 拿到结论后把这里收敛成 full 一种，variantFor 和这段注释一起删掉。
+// 属性和长链在微信发出来的 HTML 里是同时出现的，光读没法分辨哪个起决定作用。
+// 需要分辨时打开 WX_LINK_AB=1，每张卡片换一种写法发一篇，抓回来看谁活着。
+// 默认关。目标是手机端不丢链接，不是做实验，所以每张卡片都用最完整的写法。
+// 万一手机端还是剥，再 WX_LINK_AB=1 打开，靠一次推送分辨是属性还是链接形式的问题。
 const AB_ON = typeof process !== 'undefined' && process.env
-  ? process.env.WX_LINK_AB !== '0'
+  ? process.env.WX_LINK_AB === '1'
   : false;
 
 // 会员群那张固定用 full，这里只排另外三种。
