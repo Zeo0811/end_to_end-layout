@@ -185,6 +185,9 @@ async function renderCard({ title, date, coverUrl, coverDataUri, button }) {
 // 只是一条提示，不抢前面两个板块。没有封面也没有链接，素材全在仓库里，不碰网络。
 // 卫衣图是抠好白底的 PNG，换奖品只换 assets/prize-hoodie.png 和下面的文案。
 const PRIZE_HEIGHT_PT = 92;
+const PRIZE_HOODIE_PT = 118;
+// 图已用 Lanczos 预缩到 118pt × 3 = 354px 高并做过锐化，浏览器 1:1 贴上去不再二次缩放。
+// 原图压缩得厉害，再让浏览器缩一次会糊。换图时按同样的尺寸出。
 const PRIZE_IMG       = path.join(__dirname, 'assets', 'prize-hoodie.png');
 
 function buildPrizeCardHtml({ hoodieDataUri }) {
@@ -199,8 +202,8 @@ function buildPrizeCardHtml({ hoodieDataUri }) {
   .body { font-size: ${META_PX}px; line-height: 1.55; margin-top: 3px; color: rgba(255,255,255,.85); }
   .body b { font-weight: 600; color: #fff; }
   .nw { white-space: nowrap; }
-  .hoodie { position: absolute; right: -26px; top: 2px; height: 118px;
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,.2)); }
+  /* 不加 filter：drop-shadow 会让 chromium 把这层低分辨率栅格化，卫衣明显发糊 */
+  .hoodie { position: absolute; right: -26px; top: 2px; height: ${PRIZE_HOODIE_PT}px; }
   </style></head><body>
   <div class="card">
     <div class="txt">
@@ -250,5 +253,5 @@ async function renderCards(items) {
 }
 
 module.exports = { fetchImageAsDataUri, buildCardHtml, renderCard, renderCards,
-  buildPrizeCardHtml, renderPrizeCard, PRIZE_COPY, PRIZE_HEIGHT_PT,
+  buildPrizeCardHtml, renderPrizeCard, PRIZE_COPY, PRIZE_HEIGHT_PT, PRIZE_HOODIE_PT,
   CARD_WIDTH, COVER_HEIGHT, CARD_WIDTH_PT, COVER_HEIGHT_PT, DPR };
