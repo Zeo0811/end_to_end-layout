@@ -141,3 +141,34 @@ test('renderCard: 带按钮能正常出图', async () => {
   assert.ok(uri && uri.startsWith('data:image/jpeg;base64,'));
   assert.ok(uri.length > 2000);
 });
+
+// ── 卡片底部不能露白 ──
+// 带日期时 .card 高度是小数（日期行 12px × 1.6 = 19.2），元素截图会把裁剪框
+// 向上取整，多截进一条白色 body —— 3 倍图上就是底部 3 行白像素。
+async function bottomRows(uri, n = 3) {
+  const browser = await crawler.ensureBrowser();
+  const ctx = await browser.newContext();
+  try {
+    const page = await ctx.newPage();
+    return await page.evaluate(async ([u, n]) => {
+      const im = new Image(); im.src = u; await im.decode();
+      const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+      const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+      const out = [];
+      for (let k = 1; k <= n; k++) out.push([...g.getImageData(im.width >> 1, im.height - k, 1, 1).data].slice(0, 3));
+      return out;
+    }, [uri, n]);
+  } finally { await ctx.close(); }
+}
+
+for (const [label, args] of [
+  ['一行标题 + 日期', { title: '短标题', date: '2025.01.01' }],
+  ['两行标题 + 日期', { title: '这是一个很长很长的中文标题，用来验证两行标题时卡片底部会不会多出白条', date: '2025.01.01' }],
+]) {
+  test(`renderCard: 底部不露白（${label}）`, async () => {
+    const rows = await bottomRows(await renderCard({ ...args, coverDataUri: RED }));
+    for (const [r, g, b] of rows) {
+      assert.ok(r < 120 && g > 90 && b < 120, `底部应是品牌绿，实际 rgb(${r},${g},${b})`);
+    }
+  });
+}
