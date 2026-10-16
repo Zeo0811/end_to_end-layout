@@ -122,9 +122,9 @@ const S = {
   member_wrapper:  `display: block; margin: 0;`,
   member_title:    `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 40px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
 
-  // 文末「评论有奖」。没有标题，只有一张矮横幅图，紧贴在会员群卡片下面
-  // （间距就是上一张卡片 recommend_img 自带的 14px 下边距）。
+  // 文末「评论有奖」。标题沿用 H1 语汇（与推荐阅读、会员群同级），下面一张矮横幅图。
   prize_wrapper:   `display: block; margin: 0;`,
+  prize_title:     `display: block; line-height: 1.5; font-size: 24px; font-family: ${WX_FONT}; font-weight: bold; margin: 40px auto 40px auto; max-width: 100%; width: fit-content; color: #327848; text-align: center; padding: 0 0.25em; border-bottom: 8px solid #327848; word-break: normal; overflow-wrap: normal;`,
 };
 
 function applyS(key, content, defaultTag = 'section') {
@@ -450,15 +450,16 @@ function buildMemberBlock(card) {
 
 // 卡片文案的纯文本版本，给 <img alt> 用。
 // 卡片上的排版（加粗、不拆行）在 card-renderer.buildPrizeCardHtml 里，改文案两处一起改。
-const PRIZE_COPY = '评论有奖！从评论区随机抽取 1 位读者，赠送「十字路口」周边：Hands Dirty Club 卫衣';
+const PRIZE_COPY = '评论有奖：评论区随机抽取 1 位读者，赠送「十字路口」周边：Hands Dirty Club 卫衣';
 
 // 文末「评论有奖」板块。每篇都加，排在会员群下面，是正文的最后一样东西。
 //
-// 没有板块标题 —— 卡片里已经写了「评论有奖！」。也不挂链接，下面紧接着就是评论区。
+// 和会员群一样是「H1 式标题 + 一张卡片」，卡片里不再重复标题。不挂链接，下面紧接着就是评论区。
 // card 由 server 用 card-renderer.renderPrizeCard 合成后传进来：{ dataUri }
 function buildPrizeBlock(card) {
   if (!card || !card.dataUri) return '';
   return `<section style="${S.prize_wrapper}">`
+    + `<section style="${S.prize_title}">评论有奖</section>`
     + `<img src="${escAttr(card.dataUri)}" alt="${escHtml(PRIZE_COPY)}" style="${S.recommend_img}">`
     + `</section>`;
 }

@@ -187,7 +187,7 @@ async function renderCard({ title, date, coverUrl, coverDataUri, button }) {
 // ── 文末「评论有奖」卡片 ──
 //
 // 绿底横幅，左文右图，卫衣从右边出血。故意做得比推荐阅读矮很多（92 vs ~230），
-// 只是一条提示，不抢前面两个板块。没有封面也没有链接，素材全在仓库里，不碰网络。
+// 只是一条提示，不抢前面两个板块。「评论有奖」是卡片外面的板块标题，卡片里只放规则。没有封面也没有链接，素材全在仓库里，不碰网络。
 // 卫衣图是抠好白底的 PNG，换奖品只换 assets/prize-hoodie.png 和下面的文案。
 const PRIZE_HEIGHT_PT = 92;
 const PRIZE_HOODIE_PT = 118;
@@ -203,8 +203,8 @@ function buildPrizeCardHtml({ hoodieDataUri }) {
   .card { width: ${CARD_WIDTH_PT}px; height: ${PRIZE_HEIGHT_PT}px; position: relative; overflow: hidden;
           background: ${GREEN}; color: #fff; letter-spacing: ${WX_LS}; }
   .txt { position: absolute; left: ${PAD_X}px; top: 50%; transform: translateY(-50%); width: 262px; }
-  .hl { font-size: 16px; font-weight: 600; line-height: 1.3; }
-  .body { font-size: ${META_PX}px; line-height: 1.55; margin-top: 3px; color: rgba(255,255,255,.85); }
+  /* 与正文、推荐阅读卡片标题同字号；三行：抽谁 / 送什么 / 哪款 */
+  .body { font-size: ${TITLE_PX}px; line-height: 1.6; color: rgba(255,255,255,.9); }
   .body b { font-weight: 600; color: #fff; }
   .nw { white-space: nowrap; }
   /* 不加 filter：drop-shadow 会让 chromium 把这层低分辨率栅格化，卫衣明显发糊 */
@@ -212,8 +212,7 @@ function buildPrizeCardHtml({ hoodieDataUri }) {
   </style></head><body>
   <div class="card">
     <div class="txt">
-      <div class="hl">评论有奖！</div>
-      <div class="body">从评论区<b>随机抽取 1 位</b>读者，赠送<span class="nw">「十字路口」</span>周边：<span class="nw"><b>Hands Dirty Club</b> 卫衣</span></div>
+      <div class="body">评论区<b>随机抽取 1 位</b>读者<br>赠送<span class="nw">「十字路口」</span>周边：<br><span class="nw"><b>Hands Dirty Club</b> 卫衣</span></div>
     </div>
     ${hoodieDataUri ? `<img class="hoodie" src="${hoodieDataUri}">` : ''}
   </div>

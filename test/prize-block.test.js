@@ -13,11 +13,17 @@ const RECO   = [{ title: '推荐文章', url: 'https://mp.weixin.qq.com/s/x', da
 
 // ── 板块 HTML ──
 
-test('评论有奖是一张图，没有板块标题', () => {
+test('评论有奖：绿色板块标题 + 一张卡片图', () => {
   const h = buildPrizeBlock(PRIZE);
   assert.strictEqual((h.match(/<img /g) || []).length, 1, '一张卡片图');
   assert.ok(h.includes('data:image/jpeg;base64,PRZ'));
-  assert.ok(!/border-bottom: 8px/.test(h), '卡片里已经写了「评论有奖」，不要 H1 式大标题');
+  const t = h.indexOf('>评论有奖</section>');
+  assert.ok(t > 0 && t < h.indexOf('<img '), '标题在卡片上面');
+});
+
+test('板块标题与会员群标题逐项一致', () => {
+  const title = h => h.match(/<section style="([^"]+)">(加入会员群|评论有奖)<\/section>/)[1];
+  assert.strictEqual(title(buildPrizeBlock(PRIZE)), title(buildMemberBlock(MEMBER)));
 });
 
 test('不挂链接：下面紧接着就是评论区', () => {
@@ -60,10 +66,16 @@ test('卡片高 92pt，比推荐阅读卡片矮得多', () => {
   assert.ok(h.includes(`width: ${CARD_WIDTH_PT}px`));
 });
 
+test('卡片里不再有「评论有奖」标题，文案拆三行', () => {
+  const h = buildPrizeCardHtml({ hoodieDataUri: 'data:image/png;base64,X' });
+  assert.ok(!h.includes('评论有奖'), '标题已移到卡片外面');
+  assert.strictEqual((h.match(/<br>/g) || []).length, 2, '三行');
+  assert.ok(h.includes('font-size: 15px'), '与正文、推荐卡片标题同字号');
+});
+
 test('文案：随机抽取，不写「一件」', () => {
   const h = buildPrizeCardHtml({ hoodieDataUri: 'data:image/png;base64,X' });
-  assert.match(h, /评论有奖！/);
-  assert.match(h, /从评论区/);
+  assert.match(h, /评论区<b>随机抽取 1 位<\/b>读者<br>赠送.*周边：<br>/);
   assert.match(h, /随机抽取 1 位/);
   assert.match(h, /「十字路口」/);
   assert.match(h, /Hands Dirty Club/);
