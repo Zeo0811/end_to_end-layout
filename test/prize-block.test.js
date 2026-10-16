@@ -101,3 +101,14 @@ test('renderPrizeCard: 卫衣图随仓库提供，出 1125×276 的 JPEG', async
   assert.strictEqual(hgt, PRIZE_HEIGHT_PT * DPR);
   require('node:fs').writeFileSync(require('node:path').join(__dirname, 'prize-preview.jpg'), buf);
 });
+
+test('卫衣图按 3 倍显示尺寸预缩，浏览器不再二次缩放', () => {
+  const { PRIZE_HOODIE_PT } = require('../card-renderer');
+  const buf = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'assets', 'prize-hoodie.png'));
+  assert.strictEqual(buf.readUInt32BE(20), PRIZE_HOODIE_PT * DPR, 'PNG 高度应等于显示高度 × 3');
+});
+
+test('卫衣不加 filter，避免 chromium 低分辨率栅格化', () => {
+  const h = buildPrizeCardHtml({ hoodieDataUri: 'data:image/png;base64,X' });
+  assert.ok(!/\.hoodie \{[^}]*filter:/.test(h));
+});
