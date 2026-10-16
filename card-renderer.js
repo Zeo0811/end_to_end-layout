@@ -169,6 +169,11 @@ async function renderCard({ title, date, coverUrl, coverDataUri, button }) {
     const page = await context.newPage();
     await page.setContent(buildCardHtml({ title, date, coverDataUri: cover, button }), { waitUntil: 'load' });
     await probeFonts(page);
+    // 卡片高度常是小数（日期行 12px × 1.6 = 19.2），元素截图会把裁剪框向上取整，
+    // 多截进一条白色 body，图底就有一道 1pt 白线。先把高度补成整数，多出的由绿底填上。
+    await page.locator('.card').evaluate(el => {
+      el.style.height = Math.ceil(el.getBoundingClientRect().height) + 'px';
+    });
     const buf = await page.locator('.card').screenshot({ type: 'jpeg', quality: JPEG_QUALITY });
     return `data:image/jpeg;base64,${buf.toString('base64')}`;
   } catch (e) {
