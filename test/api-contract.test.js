@@ -317,6 +317,8 @@ test('tail-block: 插件 key 能取到会员群板块', async () => {
   assert.strictEqual(r.status, 200);
   assert.strictEqual(body.ok, true);
   assert.match(body.html, /加入会员群/);
+  assert.match(body.html, /评论有奖/, '评论有奖跟在会员群后面');
+  assert.ok(body.html.indexOf('加入会员群') < body.html.indexOf('评论有奖'));
 });
 
 test('recommend-html: 一篇都没选时仍返回会员群板块', async () => {
@@ -324,4 +326,5 @@ test('recommend-html: 一篇都没选时仍返回会员群板块', async () => {
   assert.strictEqual(body.ok, true);
   assert.strictEqual(body.count, 0);
   assert.match(body.html, /加入会员群/, '没选推荐也要有会员群');
+  assert.match(body.html, /评论有奖/, '没选推荐也要有评论有奖');
 });

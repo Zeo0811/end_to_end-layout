@@ -24,7 +24,7 @@ const CARD_WIDTH   = CARD_WIDTH_PT * DPR;     // 1125
 const COVER_HEIGHT = COVER_HEIGHT_PT * DPR;   // 450
 
 // 字距取自 formatter.js 的正文定义，不另写一份 —— 两边各写一份迟早会漂。
-const { WX_LS } = require('./formatter');
+const { WX_LS, PRIZE_COPY } = require('./formatter');
 
 // 字体内嵌，不依赖容器里装了什么。
 //
@@ -179,6 +179,66 @@ async function renderCard({ title, date, coverUrl, coverDataUri, button }) {
   }
 }
 
+// ── 文末「评论有奖」卡片 ──
+//
+// 绿底横幅，左文右图，卫衣从右边出血。故意做得比推荐阅读矮很多（92 vs ~230），
+// 只是一条提示，不抢前面两个板块。没有封面也没有链接，素材全在仓库里，不碰网络。
+// 卫衣图是抠好白底的 PNG，换奖品只换 assets/prize-hoodie.png 和下面的文案。
+const PRIZE_HEIGHT_PT = 92;
+const PRIZE_IMG       = path.join(__dirname, 'assets', 'prize-hoodie.png');
+
+function buildPrizeCardHtml({ hoodieDataUri }) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  ${FONT_FACES}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #fff; font-family: ${FONT}; }
+  .card { width: ${CARD_WIDTH_PT}px; height: ${PRIZE_HEIGHT_PT}px; position: relative; overflow: hidden;
+          background: ${GREEN}; color: #fff; letter-spacing: ${WX_LS}; }
+  .txt { position: absolute; left: ${PAD_X}px; top: 50%; transform: translateY(-50%); width: 262px; }
+  .hl { font-size: 16px; font-weight: 600; line-height: 1.3; }
+  .body { font-size: ${META_PX}px; line-height: 1.55; margin-top: 3px; color: rgba(255,255,255,.85); }
+  .body b { font-weight: 600; color: #fff; }
+  .nw { white-space: nowrap; }
+  .hoodie { position: absolute; right: -26px; top: 2px; height: 118px;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,.2)); }
+  </style></head><body>
+  <div class="card">
+    <div class="txt">
+      <div class="hl">评论有奖！</div>
+      <div class="body">从评论区<b>随机抽取 1 位</b>读者，赠送<span class="nw">「十字路口」</span>周边：<span class="nw"><b>Hands Dirty Club</b> 卫衣</span></div>
+    </div>
+    ${hoodieDataUri ? `<img class="hoodie" src="${hoodieDataUri}">` : ''}
+  </div>
+  </body></html>`;
+}
+
+async function renderPrizeCard() {
+  let hoodie;
+  try {
+    hoodie = `data:image/png;base64,${fs.readFileSync(PRIZE_IMG).toString('base64')}`;
+  } catch (e) {
+    console.error('[Card] 卫衣图读取失败，跳过评论有奖:', e.message);
+    return null;
+  }
+  const browser = await ensureBrowser();
+  const context = await browser.newContext({
+    deviceScaleFactor: DPR,
+    viewport: { width: CARD_WIDTH_PT, height: PRIZE_HEIGHT_PT + 40 },
+  });
+  try {
+    const page = await context.newPage();
+    await page.setContent(buildPrizeCardHtml({ hoodieDataUri: hoodie }), { waitUntil: 'load' });
+    await probeFonts(page);
+    const buf = await page.locator('.card').screenshot({ type: 'jpeg', quality: JPEG_QUALITY });
+    return `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } catch (e) {
+    console.error('[Card] 评论有奖卡片渲染失败:', e.message);
+    return null;
+  } finally {
+    await context.close();
+  }
+}
+
 // 串行渲染，不并发。Railway 内存紧张，一次只开一个 context。
 async function renderCards(items) {
   const out = [];
@@ -190,4 +250,5 @@ async function renderCards(items) {
 }
 
 module.exports = { fetchImageAsDataUri, buildCardHtml, renderCard, renderCards,
+  buildPrizeCardHtml, renderPrizeCard, PRIZE_COPY, PRIZE_HEIGHT_PT,
   CARD_WIDTH, COVER_HEIGHT, CARD_WIDTH_PT, COVER_HEIGHT_PT, DPR };
