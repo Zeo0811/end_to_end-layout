@@ -272,17 +272,19 @@ function convertNodeToHtml(node, links, context) {
     if (tag === 'a') {
       const href = child.getAttribute('href') || '';
       const text = child.textContent.trim();
+      // 显示用转换过的内部 HTML，不用 textContent：链接里的加粗等格式要保留
+      // （Notion「先加链接再加粗」时 DOM 是 <a><span 加粗>…</span></a>）。参考资料里仍记纯文本。
       // callout 内的公众号链接：直接渲染为跳转链接，不进参考资料列表
       if (context === 'callout' && isWechatArticleUrl(href) && text) {
-        html += `<a href="${escapeHtml(href)}" data-wechat-callout="1">${escapeHtml(text)}</a>`;
+        html += `<a href="${escapeHtml(href)}" data-wechat-callout="1">${innerHtml.trim()}</a>`;
         continue;
       }
       if (href && !href.startsWith('#') && text) {
         const existing = links.findIndex(l => l.url === href);
         const idx = existing >= 0 ? existing + 1 : (links.push({ text, url: href }), links.length);
-        html += `${escapeHtml(text)}<sup>[${idx}]</sup>`;
+        html += `${innerHtml.trim()}<sup>[${idx}]</sup>`;
       } else {
-        html += escapeHtml(text);
+        html += innerHtml;
       }
       continue;
     }
