@@ -378,7 +378,7 @@ function pi(html) {
       return `<a href="${href}" style="text-decoration:none;color:#222222;border-bottom:1px solid #222222;word-break:normal;overflow-wrap:break-word;">${text}</a>`;
     })
     .replace(/<sup>\[(\d+)\]<\/sup>/g,
-      `<sup style="display:inline-block;text-decoration:none;font-size:.7em;color:#222222;font-weight:bold;line-height:0;vertical-align:super;">[$1]</sup>`);
+      `<sup style="display:inline-block;text-decoration:none;text-indent:0;font-size:.7em;color:#222222;font-weight:bold;line-height:0;vertical-align:super;">[$1]</sup>`);
 }
 
 function escHtml(text) {

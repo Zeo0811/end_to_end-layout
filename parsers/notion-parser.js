@@ -272,19 +272,22 @@ function convertNodeToHtml(node, links, context) {
     if (tag === 'a') {
       const href = child.getAttribute('href') || '';
       const text = child.textContent.trim();
+      // Notion 把链接的加粗直接写在 <a> 自己的 style 上（font-weight:600），不是包在里面的 span 上
+      const linkBold = /font-weight:\s*(600|700|bold)/.test(style);
+      const shown = linkBold ? `<strong>${innerHtml.trim()}</strong>` : innerHtml.trim();
       // 显示用转换过的内部 HTML，不用 textContent：链接里的加粗等格式要保留
       // （Notion「先加链接再加粗」时 DOM 是 <a><span 加粗>…</span></a>）。参考资料里仍记纯文本。
       // callout 内的公众号链接：直接渲染为跳转链接，不进参考资料列表
       if (context === 'callout' && isWechatArticleUrl(href) && text) {
-        html += `<a href="${escapeHtml(href)}" data-wechat-callout="1">${innerHtml.trim()}</a>`;
+        html += `<a href="${escapeHtml(href)}" data-wechat-callout="1">${shown}</a>`;
         continue;
       }
       if (href && !href.startsWith('#') && text) {
         const existing = links.findIndex(l => l.url === href);
         const idx = existing >= 0 ? existing + 1 : (links.push({ text, url: href }), links.length);
-        html += `${innerHtml.trim()}<sup>[${idx}]</sup>`;
+        html += `${shown}<sup>[${idx}]</sup>`;
       } else {
-        html += innerHtml;
+        html += shown;
       }
       continue;
     }
@@ -300,9 +303,11 @@ function convertNodeToHtml(node, links, context) {
         child.classList.contains('notion-italic');
       const isStrike =
         style.includes('line-through') || child.classList.contains('notion-strikethrough');
-      const isUnder =
+      // link-annotation-* 是 Notion 给每个链接都套的下划线装饰层，不是作者手动加的下划线
+      const isLinkDecor = (child.getAttribute('class') || '').includes('link-annotation-');
+      const isUnder = !isLinkDecor && (
         (style.includes('underline') && !style.includes('line-through')) ||
-        child.classList.contains('notion-underline');
+        child.classList.contains('notion-underline'));
 
       let result = innerHtml;
       if (isBold) result = `<strong>${result}</strong>`;
