@@ -67,3 +67,12 @@ for (const [file, fn] of [['notion-parser.js', 'convertNodeToHtml'], ['feishu-pa
     assert.strictEqual(links.length, 0);
   });
 }
+
+// 角标不能带下划线：<u>文字<sup>[1]</sup></u> 时下划线会画到角标上，inline-block 截断传递
+test('formatter: 角标是 inline-block 且无下划线，挡住外层 <u>', () => {
+  const { formatToWechat } = require('../formatter');
+  const h = formatToWechat({ title: 'T', links: [], blocks: [{ type: 'paragraph', content: '<u>Claude Code<sup>[1]</sup></u>' }] });
+  const sup = h.match(/<sup style="([^"]+)">\[1\]<\/sup>/)[1];
+  assert.ok(sup.includes('display:inline-block'), sup);
+  assert.ok(sup.includes('text-decoration:none'), sup);
+});
