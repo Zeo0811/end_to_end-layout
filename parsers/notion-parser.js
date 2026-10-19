@@ -37,8 +37,21 @@ function parseNotion() {
     throw new Error(`无法找到Notion页面内容。body.class="${bodyClasses}", main=${!!mainEl}, divs=${divCount}, blocks=${blockCount}, url=${location.href}`);
   }
 
-  const blocks = parseNotionBlocks(Array.from(contentArea.children), links, 0);
+  const blocks = parseNotionBlocks(topLevelBlocks(contentArea), links, 0);
   return { type: 'notion', title, blocks, links };
+}
+
+// 正文区域里的顶层内容块，按文档顺序。
+// 老结构里它们就是 contentArea 的直接子元素；现在的 notion.site 公开页在中间
+// 多套了好几层 div，只遍历直接子元素会一个块都认不出来，发布出去正文为空。
+// 所以直接子元素里没有块时，改取「外面没有别的块包着」的 [data-block-id]。
+function topLevelBlocks(area) {
+  const direct = Array.from(area.children);
+  if (direct.some(el => el.hasAttribute && el.hasAttribute('data-block-id'))) return direct;
+  return Array.from(area.querySelectorAll('[data-block-id]')).filter(el => {
+    const outer = el.parentElement && el.parentElement.closest('[data-block-id]');
+    return !outer || !area.contains(outer);
+  });
 }
 
 function getNotionTitle() {
