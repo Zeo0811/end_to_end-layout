@@ -72,6 +72,11 @@ function normalizeUrl(url) {
   if (!/^https?:\/\//i.test(url)) {
     url = 'https://' + url;
   }
+  // app.notion.com/p/{空间}/{页面}：打开公开页时 Notion 常先停在「Continue to external site」
+  // 中转页再跳去 {空间}.notion.site，无头浏览器经常不跳，解析时页面是空壳。
+  // 直接改写成最终地址。实测 5 次里只有 1 次能直接出内容，改写后稳定。
+  const app = url.match(/^https?:\/\/app\.notion\.com\/p\/([^/?#]+)\/([^/?#]+)/i);
+  if (app) return `https://${app[1]}.notion.site/${app[2]}`;
   return url;
 }
 
@@ -262,6 +267,15 @@ async function crawl(url) {
       await page.waitForSelector(notionSelectors.join(', '), { timeout: 30000 }).catch(() => {
         console.log('[Crawler] Notion 选择器未匹配，等待额外时间...');
       });
+      // Notion 偶尔整页不渲染（空白，没有任何内容块）。刷新重试一次。
+      const hasBlocks = await page.$('[data-block-id]').catch(() => null);
+      if (!hasBlocks) {
+        console.log('[Crawler] 页面没有内容块，刷新重试一次...');
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+        await page.waitForSelector('[data-block-id]', { timeout: 30000 }).catch(() => {
+          console.log('[Crawler] 重试后仍无内容块');
+        });
+      }
       // 等待页面内容充分渲染
       await page.waitForTimeout(5000);
 
@@ -478,4 +492,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { crawl, closeBrowser, ensureBrowser };
+module.exports = { crawl, closeBrowser, ensureBrowser, normalizeUrl };
